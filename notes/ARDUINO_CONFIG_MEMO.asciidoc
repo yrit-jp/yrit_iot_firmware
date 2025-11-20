@@ -1,0 +1,161 @@
+## Arduino IDE 1.8.19 設定
+
+.ボードマネージャ
+[options="autowidth"]
+|===
+|esp32 | v2.0.14 (ESP-IDF v4.4.6)
+|M5Stack | v2.1.4 (ESP-IDF v4.4.6)
+|Seeed SAMD Boards | v1.8.5
+|===
+
+---
+
+.ESP32 Dev Module
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Frequency | 80MHz
+|Flash Mode | QIO
+|Flash Size | 4MB (32Mb)
+|Partition Scheme | Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+|Core Debug Level | なし
+|PSRAM | Disabled
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|===
+
+
+.M5Core
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 1500000
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Frequency | 80MHz
+|Flash Mode | QIO
+|Flash Size | 4MB (32Mb)
+|Partition Scheme | Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+|Core Debug Level | なし
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|===
+
+
+.M5Stack-Station
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 1500000
+|CPU Frequency | 240MHz (WiFi/BT)
+|Partition Scheme | Minimal SPIFFS (Large APPS with OTA)
+|Core Debug Level | なし
+|Erase All Flash Before Sketch Upload | Disabled
+|===
+
+
+.M5Stick-C-Plus
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 1500000
+|CPU Frequency | 240MHz (WiFi/BT)
+|Partition Scheme | Minimal SPIFFS (Large APPS with OTA)
+|Core Debug Level | なし
+|Erase All Flash Before Sketch Upload | Disabled
+|===
+
+
+.M5Stack-ATOMS3
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|USB Mode | Hardware CDC and JTAG
+|USB CDC On Boot | Enabled
+|USB Firmware MSC On Boot | Disabled 
+|USB DFU On Boot | Disabled
+|Upload Mode | UART0 / Hardware CDC
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Mode | QIO 80MHz
+|Flash Size | 8MB (64Mb)
+|Partition Scheme | 8M with spiffs (3MB APP/1.5MB SPIFFS)
+|Core Debug Level | なし
+|PSRAM | Disabled
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|===
+
+.M5Stack-CoreS3
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|USB Mode | Hardware CDC and JTAG
+|USB CDC On Boot | Enabled
+|USB Firmware MSC On Boot | Disabled 
+|USB DFU On Boot | Disabled
+|Upload Mode | UART0 / Hardware CDC
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Mode | QIO 80MHz
+|Flash Size | 16MB (128Mb)
+|Partition Scheme | 8M with spiffs (3MB APP/1.5MB SPIFFS)
+|Core Debug Level | なし
+|PSRAM | QSPI PSRAM
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|===
+
+.M5Stack-Core2
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|CPU Frequency | 240MHz (WiFi/BT)
+|Partition Scheme | Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+|Core Debug Level | なし
+|PSRAM | Enabled
+|Erase All Flash Before Sketch Upload | Disabled
+|===
+
+
+.M5Stack-Tough
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Frequency | 80MHz
+|Flash Mode | QIO
+|Flash Size | 16MB (128Mb)
+|Partition Scheme | Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+|Core Debug Level | なし
+|PSRAM | Enabled
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|===
+
+
+.Seeeduino Wio Terminal
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Role | Master
+|Cache | Enabled
+|CPU Speed | 120 MHz (standard)
+|Optimizer | Small (-Os) (standard)
+|Max QSPI | 50 MHz (standard)
+|USB Stack | Arduino
+|Debug | Off
+|TX/RX LED | On
+|===
+

@@ -1,0 +1,198 @@
+#if defined(ARDUINO_M5Stick_C_PLUS) || defined(ARDUINO_M5STACK_STICKC_PLUS)
+
+#ifndef HAL_API_M5STICK_C_PLUS_H
+#define HAL_API_M5STICK_C_PLUS_H
+
+#include "../hal_interface.h"
+#include <ESPmDNS.h>
+#include <M5Unified.h>
+#include <NimBLEDevice.h>
+#include <SPI.h>
+#include <SPIFFS.h>
+#include <WiFi.h>
+// #include <WiFiClientSecure.h>
+#include <WiFiType.h>
+#include <driver/pcnt.h>
+#include <esp_task_wdt.h>
+#include <soc/pcnt_struct.h>
+
+class HAL_Display_API : public IDisplayControl {
+public:
+	void drawPixel(int32_t x, int32_t y, uint32_t color);
+	void drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size);
+	void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
+	void drawFastVLine(int32_t x, int32_t y, int32_t h, uint32_t color);
+	void drawFastHLine(int32_t x, int32_t y, int32_t w, uint32_t color);
+	void fillScreen(uint32_t color);
+
+	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font);
+	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y);
+	int16_t height(void);
+	int16_t width(void);
+	int16_t drawString(const char *string, int32_t poX, int32_t poY, uint8_t font);
+	int16_t drawString(const char *string, int32_t poX, int32_t poY);
+	int16_t color565(uint8_t red, uint8_t green, uint8_t blue);
+
+	void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+	void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color);
+	void drawRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color);
+	void fillRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color);
+
+	void setRotation(uint8_t r);
+	void startWrite();
+	void endWrite();
+
+	void drawCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color);
+	void fillCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color);
+	void drawEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color);
+	void fillEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color);
+	void drawTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color);
+	void fillTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color);
+
+	void pushImage(int32_t x, int32_t y, int32_t w, int32_t h, uint16_t *data) override;
+
+	bool initializeSemaphoreMutex() override;
+	bool takeSemaphoreMutex(uint32_t wait_tick_time) override;
+	bool giveSemaphoreMutex() override;
+};
+
+class HAL_Timer_API : public ITimerControl {
+public:
+	using ITimerControl::ITimerControl;
+	void begin(uint32_t interval_ms);
+	void addSubTimer(std::string key,
+	                 uint32_t count_limit,
+	                 uint32_t initial_count = 0);
+	uint32_t getSubTimerLimit(std::string key);
+	uint32_t getSubTimerLimitMillis(std::string key);
+	void removeSubTimer(std::string key);
+	bool checkSubTimer(std::string key, bool reset = true);
+	void start(bool enable_first_interrupt = false);
+	bool interrupted();
+
+private:
+	uint32_t _interval_ms;
+};
+
+class HAL_WLAN_API : public IWirelessLanControl<WiFiClient> {
+public:
+	int getStatus();
+	int getRSSI();
+	std::vector<uint8_t> fetchMacAddress() override;
+	MyIPAddress localIP();
+	bool config(String ip, String gateway, String subnet, String dns1, String dns2);
+	bool connectWlan(unsigned long timeout_ms = 0);
+	bool connectWlan(String ap_name, String pass, unsigned long timeout_ms = 0);
+	void disconnectWlan(bool exit_sta_mode = true, bool erase_ap_settings = true);
+	bool detectTargetAccessPoint(String ap_name, int32_t *rssi, bool *exist_same_name, bool print_result = true);
+	MyIPAddress resolveMDNS(String host, uint8_t try_count = 2);
+	std::map<int, String> scanAccessPoint(bool print_result = true);
+};
+
+class HAL_NTP_RTC_API : public INtpRtcControl {
+public:
+	bool begin();
+	bool ready();
+	bool update() override;
+	bool getCurrentTime(struct tm *timeinfo);
+
+private:
+	String selected_ntp_server = "";
+	bool _inited               = false;
+};
+
+class HAL_SETTING_FILE_IO_API : public ISettingFileInputOutputControl {
+public:
+	bool saveSettings(String fpath, JsonDocument json);
+	bool loadSettings(String fpath, JsonDocument &json);
+	bool formatStorage();
+
+	JsonDocument deviceUniqueSettings() override;
+};
+
+class HAL_BLE_API : public IBluetoothLowEnergyControl {
+public:
+	void begin(String local_name) override;
+};
+
+class HAL_GPIO_API : public IGpioControl {
+public:
+	std::vector<uint8_t> getPins() override;
+	String getModifier() override;
+	bool initializePulseCounter(uint8_t pin, PULSE_EDGE edge) override;
+	bool stopPulseCounter(uint8_t pin) override;
+	bool startPulseCounter(uint8_t pin) override;
+	bool stopPulseCounterAll() override;
+	bool startPulseCounterAll() override;
+	uint32_t getMaxPulseCount() override;
+	bool updatePulseCount(uint8_t pin) override;
+	void resetPulseCount(uint8_t pin) override;
+	void resetPulseCountAll() override;
+
+private:
+	uint8_t AVAILABLE_UNIT_NUMBER = 0;
+	std::map<uint8_t, pcnt_unit_t> _pin_unit_map;
+};
+
+class HAL_I2C_API : public IWireI2cControl<TwoWire> {
+public:
+	bool begin(uint8_t port) override;
+};
+
+class HAL_API : public IHardwareAbstractionLayer<SemaphoreHandle_t> {
+public:
+	HAL_API() : Timer0(0), Timer1(1), Timer2(3), Log() {};
+
+	void begin();
+	void update();
+	uint8_t waitForButtonPressed(uint16_t wait_ms);
+	uint8_t BtnA_wasPressed();
+	uint8_t BtnB_wasPressed();
+	uint8_t BtnC_wasPressed();
+	uint8_t BtnA_isPressed();
+	uint8_t BtnB_isPressed();
+	uint8_t BtnC_isPressed();
+	String getChipUUID(bool include_prefix = true);
+
+	void delay(uint32_t ms);
+	void reboot();
+
+	void endSetup() override;
+	int8_t getBatteryLevel() override;
+	uint32_t getRandomNumber(uint32_t minimum = 0, uint32_t maximum = UINT32_MAX) override;
+	void periodicLoopTaskDebugMessage() override;
+
+	bool initializeSemaphoreMutex(String key) override;
+	bool takeSemaphoreMutex(String key, uint32_t wait_tick_time) override;
+	bool giveSemaphoreMutex(String key) override;
+
+	HAL_Display_API Display;
+
+	HAL_Timer_API Timer0;
+	HAL_Timer_API Timer1;
+	HAL_Timer_API Timer2;
+
+	HAL_WLAN_API Wlan;
+	IWiredLanControl<DummyClient> Lan;
+	HAL_NTP_RTC_API NtpRtc;
+
+	ILedControl Led_Status;
+	ILedControl Led_Warning;
+
+	HAL_SETTING_FILE_IO_API FileIO;
+	HAL_BLE_API Ble;
+	ITfCardControl Tf;
+	IDebugLogControl Log;
+
+	HAL_GPIO_API Gpio;
+	HAL_I2C_API I2c;
+	IModbusControl Modbus;
+	ICameraControl Camera;
+
+	IMetadataControl Info;
+};
+
+extern HAL_API HAL;
+
+#endif /* HAL_API_M5STICK_C_PLUS_H */
+#endif /* ARDUINO_M5Stick_C_PLUS || ARDUINO_M5STACK_STICKC_PLUS */

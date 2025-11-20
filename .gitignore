@@ -1,0 +1,6 @@
+/build/output
+/build/cache
+*example/
+*examples/
+.vscode
+!.vscode/settings.json

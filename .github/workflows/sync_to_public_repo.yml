@@ -1,0 +1,55 @@
+name: Sync to Public Repository
+
+on:
+  workflow_dispatch:
+
+jobs:
+  sync:
+    name: Sync to Public Repo
+    runs-on: ubuntu-24.04
+    environment: public-sync
+    permissions:
+      actions: write
+      checks: write
+      contents: write
+    steps:
+      # 認証用のGitHub Appトークンを生成
+      - name: Generate GitHub App Token
+        uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          app-id: ${{ secrets.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      # GitHub App botアカウントのユーザーIDを取得
+      # gitコミットの作成者情報を正しく設定するために使用
+      - name: Get GitHub App User ID
+        id: get-user-id
+        run: echo "user-id=$(gh api "/users/${{ steps.app-token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      # ソースブランチを完全な履歴付きでチェックアウト
+      # fetch-depth: 0 により全てのコミットとタグを取得
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          ref: ${{ vars.SOURCE_BRANCH }}
+          token: ${{ steps.app-token.outputs.token }}
+
+      # GitHub App botの識別情報でgitを設定
+      - name: Configure Git
+        run: |
+          git config user.name '${{ steps.app-token.outputs.app-slug }}[bot]'
+          git config user.email '${{ steps.get-user-id.outputs.user-id }}+${{ steps.app-token.outputs.app-slug }}[bot]@users.noreply.github.com'
+      
+      # パブリックリポジトリへプッシュ
+      # --force: リモートの履歴を上書きして完全な同期を保証
+      # --tags: 全てのタグも含めてプッシュ
+      - name: Push to Public Repository
+        run: |
+          git push ${{ vars.PUBLIC_REMOTE_REPOSITORY }} HEAD:${{ vars.DESTINATION_BRANCH }} --tags --force
+        env:
+          GIT_TERMINAL_PROMPT: 0

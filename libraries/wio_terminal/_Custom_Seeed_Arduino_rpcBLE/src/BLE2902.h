@@ -1,0 +1,40 @@
+/*
+ * BLE2902.h
+ *
+ *  Created on: Jun 25, 2017
+ *      Author: kolban
+ */
+
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * 
+ * References:
+ * https://github.com/Seeed-Studio/Seeed_Arduino_rpcBLE
+ * https://github.com/espressif/arduino-esp32/tree/master/libraries/BLE
+ * https://github.com/espressif/arduino-esp32/pull/5261
+ */
+
+#ifndef COMPONENTS_CPP_UTILS_BLE2902_H_
+#define COMPONENTS_CPP_UTILS_BLE2902_H_
+
+#include "BLEDescriptor.h"
+
+/**
+ * @brief Descriptor for Client Characteristic Configuration.
+ *
+ * This is a convenience descriptor for the Client Characteristic Configuration which has a UUID of 0x2902.
+ *
+ * See also:
+ * https://www.bluetooth.com/specifications/gatt/viewer?attributeXmlFile=org.bluetooth.descriptor.gatt.client_characteristic_configuration.xml
+ */
+class BLE2902: public BLEDescriptor {
+public:
+	BLE2902();
+	bool getNotifications();
+	bool getIndications();
+	void setNotifications(bool flag);
+	void setIndications(bool flag);
+
+}; // BLE2902
+
+#endif /* COMPONENTS_CPP_UTILS_BLE2902_H_ */

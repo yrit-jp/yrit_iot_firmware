@@ -1,0 +1,29 @@
+{
+    "name": "arduino_ftpclient",
+    "version": "1.0.0",
+    "description": "A FTP-Client for the Arduino",
+    "keywords": "sensors, low power, mobile, ftp, web, cloud, iot, esp32, espressif",
+    "authors": [
+        {
+            "name": "Leonardo Bispo",
+            "url": "https://github.com/ldab",
+            "maintainer": true
+        },
+        {
+            "name": "takkaO",
+            "url": "https://github.com/takkaO",
+            "maintainer": true
+        }
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/takkaO/Arduino_FTPClient.git"
+    },
+    "homepage": "https://github.com/takkaO/Arduino_FTPClient",
+    "export": {
+        "exclude": ["linux", "extras"]
+    },
+    "frameworks": "arduino",
+    "platforms": "*",
+    "examples": "examples/*/*.ino"
+}

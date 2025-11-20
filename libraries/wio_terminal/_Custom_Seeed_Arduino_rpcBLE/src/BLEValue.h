@@ -1,0 +1,48 @@
+/*
+ * BLEValue.h
+ *
+ *  Created on: Jul 17, 2017
+ *      Author: kolban
+ */
+
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * 
+ * References:
+ * https://github.com/Seeed-Studio/Seeed_Arduino_rpcBLE
+ * https://github.com/espressif/arduino-esp32/tree/master/libraries/BLE
+ * https://github.com/espressif/arduino-esp32/pull/5261
+ */
+
+#ifndef COMPONENTS_CPP_UTILS_BLEVALUE_H_
+#define COMPONENTS_CPP_UTILS_BLEVALUE_H_
+
+#include <string>
+
+/**
+ * @brief The model of a %BLE value.
+ */
+class BLEValue {
+public:
+	BLEValue();
+	void		addPart(std::string part);
+	void		addPart(uint8_t* pData, size_t length);
+	void		cancel();
+	void		commit();
+	uint8_t*	getData();
+	size_t	    getLength();
+	uint16_t	getReadOffset();
+	std::string getValue();
+	void        setReadOffset(uint16_t readOffset);
+	void        setValue(std::string value);
+	void        setValue(uint8_t* pData, size_t length);
+
+private:
+	std::string m_accumulation;
+	uint16_t    m_readOffset;
+	uint8_t     *m_value;
+	size_t 	m_length;
+
+};
+
+#endif /* COMPONENTS_CPP_UTILS_BLEVALUE_H_ */
