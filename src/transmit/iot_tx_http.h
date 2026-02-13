@@ -30,6 +30,7 @@ protected:
 	IoTTx_Tx_Result transmitEx() override;
 
 	struct HttpHelper::UniformResourceLocator _target;
+	PenaltyHelper _penalty_wait;
 };
 
 #endif /* MY_HTTP_H */

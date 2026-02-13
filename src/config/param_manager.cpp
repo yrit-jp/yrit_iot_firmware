@@ -9,15 +9,15 @@ enum SettingLoadResult ParamManager::begin(bool reset_settings) {
 	// debugLog("Initialize setting template...");
 	setSettingTemplate(defineSettingTemplate());
 
-	if (reset_settings || !HAL.FileIO.loadSettings(_setting_fpath, _doc)) {
+	if (reset_settings or not HAL.FileIO.loadSettings(_setting_fpath, _doc)) {
 		// debugLog("Initialized setting file");
 		reload(true);
 		result = INITIALIZED;
 	}
 
-	if (!checkParamItems(_doc, defineSettingTemplate())) {
+	if (not checkParamItems(_doc, defineSettingTemplate())) {
 		// debugLog("Format storage...");
-		if (!HAL.FileIO.formatStorage()) {
+		if (not HAL.FileIO.formatStorage()) {
 			// debugLog("Format failed...");
 			return FAILED;
 		} else {
@@ -25,10 +25,10 @@ enum SettingLoadResult ParamManager::begin(bool reset_settings) {
 			setSettingTemplate(defineSettingTemplate());
 			reload(true);
 
-			if (!checkParamItems(_doc, defineSettingTemplate())) {
+			result = FORMATTED;
+			if (not checkParamItems(_doc, defineSettingTemplate())) {
 				result = FAILED;
 			}
-			result = FORMATTED;
 		}
 	}
 	return result;
@@ -67,7 +67,7 @@ void ParamManager::clearSettingTemplate() {
 bool ParamManager::checkParamItems(JsonDocument target, JsonDocument source) {
 	for (JsonPair kv : source.as<JsonObject>()) {
 		if (kv.value().is<JsonObject>()) {
-			if (!checkParamItems(target[kv.key()], source[kv.key()])) {
+			if (not checkParamItems(target[kv.key()], source[kv.key()])) {
 				return false;
 			}
 			continue;

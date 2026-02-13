@@ -18,32 +18,62 @@ extern struct SystemMessageRenderParam smrp;
 volatile bool PlayLoadAnimation = false;
 TaskHandle_t LoadAnimationTask;
 void loadAnimationLoop(void *pvParameters) {
-	uint16_t center_x = 160; // Circle center X
-	uint16_t center_y = 160; // Circle center Y
-	uint16_t i        = 0;   // Degree
-	uint8_t up        = 5;   // Round speed
-	uint8_t r         = 20;  // Main circle radius
-	uint8_t cr        = 2;   // Sub circle radius
+	// Animation parameters
+	const uint16_t CENTER_X = 160;
+	const uint16_t CENTER_Y = 160;
+	const uint8_t ROTATION_SPEED = 5;
+	const uint8_t ORBIT_RADIUS = 20;
+	const uint8_t DOT_RADIUS = 2;
+	const uint8_t NUM_DOTS = 5;
+	const float DOT_SPACING_ANGLE = 0.8f; // radians between dots
+	const uint8_t BASE_DELAY = 15;
+	const uint8_t DELAY_VARIATION = 5;
+
+	// Pre-calculate grayscale colors for each dot
+	const uint16_t dot_colors[NUM_DOTS] = {
+		HAL.Display.color565(51, 51, 51),
+		HAL.Display.color565(102, 102, 102),
+		HAL.Display.color565(153, 153, 153),
+		HAL.Display.color565(204, 204, 204),
+		HAL.Display.color565(255, 255, 255)
+	};
+
+	uint16_t angle_degrees = 0;
 
 	while (PlayLoadAnimation) {
+		float angle_rad = deg_to_rad(angle_degrees);
 
+		// Pre-calculate positions for all dots
+		int16_t dot_x[NUM_DOTS];
+		int16_t dot_y[NUM_DOTS];
+		for (int k = 0; k < NUM_DOTS; k++) {
+			float dot_angle = angle_rad - k * DOT_SPACING_ANGLE;
+			dot_x[k] = CENTER_X + ORBIT_RADIUS * cos(dot_angle);
+			dot_y[k] = CENTER_Y - ORBIT_RADIUS * sin(dot_angle);
+		}
+
+		// Draw dots
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-		for (int k = 0; k < 5; k++) {
-			uint16_t color = HAL.Display.color565((51 * (k + 1)), (51 * (k + 1)), (51 * (k + 1)));
-			HAL.Display.fillEllipse(center_x + r * cos(deg_to_rad(i) - k * 0.8), center_y - r * sin(deg_to_rad(i) - k * 0.8), cr, cr, color);
+		for (int k = 0; k < NUM_DOTS; k++) {
+			HAL.Display.fillEllipse(dot_x[k], dot_y[k], DOT_RADIUS, DOT_RADIUS, dot_colors[k]);
 		}
 		HAL.Display.giveSemaphoreMutex();
 
-		HAL.delay(15 + 5 * (1 - sin(deg_to_rad(i))));
+		// Variable delay for smooth animation
+		uint8_t delay_time = BASE_DELAY + DELAY_VARIATION * (1 - sin(angle_rad));
+		HAL.delay(delay_time);
 
+		// Erase dots (draw in black)
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-		for (int k = 0; k < 5; k++) {
-			HAL.Display.fillEllipse(center_x + r * cos(deg_to_rad(i) - k * 0.8), center_y - r * sin(deg_to_rad(i) - k * 0.8), cr, cr, TFT_BLACK);
+		for (int k = 0; k < NUM_DOTS; k++) {
+			HAL.Display.fillEllipse(dot_x[k], dot_y[k], DOT_RADIUS, DOT_RADIUS, TFT_BLACK);
 		}
 		HAL.Display.giveSemaphoreMutex();
 
-		i = ((i - up) <= 0) ? 360 : (i - up);
+		// Update angle
+		angle_degrees = (angle_degrees <= ROTATION_SPEED) ? 360 : (angle_degrees - ROTATION_SPEED);
 	}
+
 	LoadAnimationTask = NULL;
 	vTaskDelete(NULL);
 }
@@ -102,7 +132,7 @@ void updateDisplayOverrideBottom(std::unique_ptr<OpenFontRender> &render,
 
 		PlayLoadAnimation = true;
 		// SYSTEM_READY でタスクをDelete
-		const uint8_t TOP_PRIORITY    = 25; // 0 ~ 25
+		const uint8_t TOP_PRIORITY    = 24; // 0 ~ 24
 		const int STACK_SIZE          = 2048;
 		const uint8_t USE_CORE_NUMBER = 0;
 		xTaskCreatePinnedToCore(loadAnimationLoop,

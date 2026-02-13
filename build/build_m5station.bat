@@ -76,8 +76,8 @@ if errorlevel 1 (
   powershell -Command "Write-Host '  arduino-cli compile error occurred.' -ForegroundColor Red"
   powershell -Command "Write-Host '========================================' -ForegroundColor Red"
   echo.
-  pause
-  exit /b 1
+  set BUILD_STATUS=FAILED
+  goto :finish
 )
 
 REM 一括リネーム
@@ -90,7 +90,7 @@ if defined v_release_tag (
   copy ..\CHANGELOG_BETA.md .\output\!TARGET!\!PROGRAM_DIR!\CHANGELOG.md
 ) else (
   REM v_release_tag is empty
-  copy ..\CHANGELOG.md .\output\!TARGET!\!PROGRAM_DIR! 
+  copy ..\CHANGELOG.md .\output\!TARGET!\!PROGRAM_DIR!
 )
 
 REM boot_app0 ファイルをコピー
@@ -100,6 +100,23 @@ REM 不要ファイルの削除
 del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.map
 del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.elf
 
+REM 成功時の処理
+set BUILD_STATUS=SUCCESS
+
+:finish
+echo.
+echo Finish. Target: !TARGET!
+if "!BUILD_STATUS!"=="SUCCESS" (
+  powershell -Command "Write-Host 'Build Status: SUCCESS' -ForegroundColor Green"
+) else (
+  powershell -Command "Write-Host 'Build Status: FAILED' -ForegroundColor Red"
+)
+echo.
+
 REM 終了時にベルを鳴らす
 echo 
 pause
+
+REM エラーステータスで終了
+if "!BUILD_STATUS!"=="FAILED" exit /b 1
+exit /b 0

@@ -87,10 +87,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		uint8_t wait_sec = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
+		initMsgBox(CursorPosition::DUAL_LINE);
 		render->printf("起動モードの選択\n（%d秒後に通常モードで起動）\n", wait_sec);
 
 		// ボタン表示
@@ -141,8 +138,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::SS_MODE_ENTRY: {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
+		initMsgBox();
 		render->setAlignment(Align::TopLeft);
 		render->setFontSize(smrp.FONT_SIZE);
 		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
@@ -196,10 +192,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::SS_CLEAR_ALL:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("ファイルシステムの\n初期化中 ...");
 
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
@@ -208,10 +201,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::SS_FORMAT:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("ファイルシステムの準備中 ...");
 
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
@@ -233,8 +223,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int hold_sec            = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
+		initMsgBox();
 		render->setFontSize(smrp.FONT_SIZE);
 		for (uint8_t c = hold_sec; c != 0; c--) {
 			render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
@@ -257,8 +246,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 			HAL.delay(1000);
 			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		}
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
+		initMsgBox();
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
 		dt = DisplayTiming::IGNORE_DEFAULT_PROCESS;
@@ -267,10 +255,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::GPIO_INIT_BEGIN:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("GPIOデバイス\n初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -279,10 +264,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::PULSE_COUNTER_INIT_BEGIN:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("パルスカウンタ\n初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -292,10 +274,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		uint8_t pin = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("ピン %d の\n初期化中", pin);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -305,10 +284,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::I2C_INIT_DEVICE_BEGIN:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("I2Cデバイス\n初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -320,10 +296,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int i2c_dev_num = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("（%d/%d）I2Cデバイス（0x%02X）の\n初期化中", progress, i2c_dev_num, address);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -333,10 +306,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::MODBUS_INIT_PERIPHERAL_BEGIN: {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("Modbus 初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -347,10 +317,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		uint8_t port = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("ポート %d\n初期化中 ...", port);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -360,10 +327,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::MODBUS_INIT_DEVICE_BEGIN: {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("Modbusデバイス\n初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -377,10 +341,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int modbus_dev_num = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("（%d/%d）ID:%d / ポート:%d\nModbus デバイスの初期化中", progress, modbus_dev_num, id, port);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -391,10 +352,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		const char *target_ssid = va_arg(ap, const char *);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続中\n(%.16s)", target_ssid);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -404,10 +362,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::WIFI_SEARCH_TARGET:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("SSID 検索中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -416,10 +371,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::WIFI_CONNECT_SUCCESS:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi の接続完了");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -428,10 +380,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::WIFI_CONNECT_FAILED:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->setFontColor(TFT_RED);
 		render->printf("WiFi の接続に失敗\n10秒後に再起動します...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
@@ -442,10 +391,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		const char *target_ssid = va_arg(ap, const char *);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("SSID を発見しました\n (%.16s)", target_ssid);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -456,10 +402,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		const char *target_ssid = va_arg(ap, const char *);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
+		initMsgBox(CursorPosition::DUAL_LINE);
 		render->setFontColor(TFT_YELLOW);
 		render->printf("SSID が見つかりませんでした\n(%.16s)", target_ssid);
 		render->setFontColor(TFT_WHITE);
@@ -471,10 +414,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::NTP_INIT_BEGIN:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("時刻同期\n初期化準備中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -483,10 +423,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::NTP_CONNECT_WIFI:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続\n（NTP） ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -495,10 +432,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::NTP_SYNC_START:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("NTP サーバと\n時刻を同期中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -507,10 +441,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::NTP_SYNC_FAILED:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->setFontColor(TFT_RED);
 		render->printf("時刻の同期に失敗しました\n10秒後に再起動します...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
@@ -520,10 +451,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::AMBIENT_CONNECT_WIFI:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続中（Ambient） ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -532,10 +460,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::FTP_CONNECT_WIFI:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続中（FTP） ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -544,10 +469,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::HTTP_CONNECT_WIFI:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続中（HTTP） ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -556,10 +478,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::MQTT_CONNECT_WIFI:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("WiFi 接続中（MQTT） ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -568,10 +487,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::DISPLAY_OFFLINE_MODE:
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->printf("OFFLINE モードで起動中 ...");
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
@@ -582,10 +498,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int sensor_num     = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT);
+		initMsgBox();
 		render->setFontColor(TFT_GREENYELLOW);
 		render->printf("システムを起動する準備が\n完了しました!");
 		render->setFontColor(TFT_WHITE);
@@ -631,7 +544,7 @@ void updateDisplayOverrideBottom(std::unique_ptr<OpenFontRender> &render,
 
 		PlayLoadAnimation = true;
 		// SYSTEM_READY でタスクをDelete
-		const uint8_t TOP_PRIORITY    = 25; // 0 ~ 25
+		const uint8_t TOP_PRIORITY    = 24; // 0 ~ 24
 		const int STACK_SIZE          = 2048;
 		const uint8_t USE_CORE_NUMBER = 0;
 		xTaskCreatePinnedToCore(loadAnimationLoop,

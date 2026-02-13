@@ -29,6 +29,20 @@ public:
 
 protected:
 	// ==============================================================
+	//! @brief addValue の前処理（センサフィルタリング）
+	//! @param[in] (name) センサ名
+	//! @return フィルタ対象の場合は true, それ以外は false
+	// =============================================================
+	bool preAddValue(const String &name) override;
+
+	// ==============================================================
+	//! @brief addExceptionalValue の前処理（すべて非対応）
+	//! @param[in] (storage) ストレージ番号
+	//! @return 常に false（Ambient は特殊データ非対応）
+	// =============================================================
+	bool preAddExceptionalValue(uint8_t storage) override;
+
+	// ==============================================================
 	//! @brief データ送信処理を行います
 	//! @return 送信結果に応じたステータス変数（IoTTx_Tx_Result）
 	// =============================================================
@@ -39,6 +53,7 @@ protected:
 	unsigned int _channel_id;
 
 	Ambient _ambient;
+	PenaltyHelper _penalty_wait;
 };
 
 #endif /* MY_AMBIENT_H */

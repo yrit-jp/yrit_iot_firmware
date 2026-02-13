@@ -91,7 +91,7 @@ void mergeJson(JsonVariant dst, JsonVariantConst src) {
 			}
 		}
 	} else {
-		if (!src.isNull()) {
+		if (not src.isNull()) {
 			dst.set(src);
 		}
 	}

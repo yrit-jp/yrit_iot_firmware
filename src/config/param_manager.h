@@ -32,6 +32,30 @@ public:
 		return _doc[category][key].as<T>();
 	};
 
+	template <typename T>
+	T getParameter(const char *category, const char *key, T default_value) {
+		if (checkParameter(category, key) == false) {
+			return default_value;
+		}
+		return _doc[category][key].as<T>();
+	};
+
+	bool getParameter(const char *category, const char *key, bool default_value) {
+		if (checkParameter(category, key) == false) {
+			return default_value;
+		}
+
+		const char *str = _doc[category][key].as<const char *>();
+		if (str == nullptr) {
+			return false;
+		}
+
+		if (strcmp(str, "true") == 0) {
+			return true;
+		}
+		return false;
+	}
+
 	bool checkParameter(const char *category, const char *key) {
 		JsonVariant err = _doc[category][key];
 		if (err.isNull()) {

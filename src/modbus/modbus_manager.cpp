@@ -6,6 +6,7 @@
 #include "sen0604.h"
 #include "sensing_eye_73x.h"
 #include "wld_pa.h"
+#include "xy-md02.h"
 #include "ypms-482d.h"
 #include "ypms-482p.h"
 
@@ -55,7 +56,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 	// バス状態の安定化用、Serialリセットでも良いかも
 	HAL.delay(bus_reset_ms);
 
-	if (!modbus_sensors[port][id].kw7m) {
+	if (not modbus_sensors[port][id].kw7m) {
 		// Panasonic Eco-Power meter
 		modbus_sensors[port][id].kw7m.reset(new KW7M(_serial));
 		if (modbus_sensors[port][id].kw7m->begin(id, timeout_ms) == true) {
@@ -67,7 +68,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].km_n1_flk) {
+	if (not modbus_sensors[port][id].km_n1_flk) {
 		// Omron small power monitor
 		modbus_sensors[port][id].km_n1_flk.reset(new KM_N1_FLK(_serial));
 		if (modbus_sensors[port][id].km_n1_flk->begin(id, timeout_ms) == true) {
@@ -79,7 +80,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].ypms_482p) {
+	if (not modbus_sensors[port][id].ypms_482p) {
 		// Yamagata TOA DKK pH/ORP monitor
 		modbus_sensors[port][id].ypms_482p.reset(new YPMS_482P(_serial));
 		if (modbus_sensors[port][id].ypms_482p->begin(id, timeout_ms) == true) {
@@ -91,7 +92,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].sensing_eye_73x) {
+	if (not modbus_sensors[port][id].sensing_eye_73x) {
 		// Techno-morioka EC monitor
 		modbus_sensors[port][id].sensing_eye_73x.reset(new SENSING_EYE_73X(_serial));
 		if (modbus_sensors[port][id].sensing_eye_73x->begin(id, timeout_ms) == true) {
@@ -102,7 +103,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].sen0604) {
+	if (not modbus_sensors[port][id].sen0604) {
 		// DFRobot SEN0604 Humid/Temp/EC/pH
 		modbus_sensors[port][id].sen0604.reset(new SEN0604(_serial));
 		if (modbus_sensors[port][id].sen0604->begin(id, timeout_ms) == true) {
@@ -113,7 +114,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].wld_pa) {
+	if (not modbus_sensors[port][id].wld_pa) {
 		// Watanabe WLD-PAXXR power monitor
 		modbus_sensors[port][id].wld_pa.reset(new WLD_PA(_serial));
 		if (modbus_sensors[port][id].wld_pa->begin(id, timeout_ms) == true) {
@@ -124,7 +125,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].ypms_482d) {
+	if (not modbus_sensors[port][id].ypms_482d) {
 		// Yamagata TOA DKK DO monitor
 		modbus_sensors[port][id].ypms_482d.reset(new YPMS_482D(_serial));
 		if (modbus_sensors[port][id].ypms_482d->begin(id, timeout_ms) == true) {
@@ -136,7 +137,7 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
-	if (!modbus_sensors[port][id].xy_md02) {
+	if (not modbus_sensors[port][id].xy_md02) {
 		// XY-MD02
 		modbus_sensors[port][id].xy_md02.reset(new XY_MD02(_serial));
 		if (modbus_sensors[port][id].xy_md02->begin(id, timeout_ms) == true) {
@@ -645,7 +646,7 @@ MODBUS_DATA_RESULT Modbus_Manager::fetchData(uint8_t port,
 		switch (sub_id) {
 		case 0:
 			// 湿度
-			result = modbus_user_sensors[port][id].xy_md02->fetchHumidity(id, d_data);
+			result = modbus_sensors[port][id].xy_md02->fetchHumidity(id, d_data);
 			if (result) {
 				return MODBUS_RES_DOUBLE;
 			}
@@ -653,7 +654,7 @@ MODBUS_DATA_RESULT Modbus_Manager::fetchData(uint8_t port,
 
 		case 1:
 			// 温度
-			result = modbus_user_sensors[port][id].xy_md02->fetchTemperature(id, d_data);
+			result = modbus_sensors[port][id].xy_md02->fetchTemperature(id, d_data);
 			if (result) {
 				return MODBUS_RES_DOUBLE;
 			}
@@ -753,7 +754,7 @@ void Modbus_Manager::scanDevice(uint8_t port, uint8_t min_id, uint8_t max_id) {
 		                                         1);
 
 		// HAL.printf("\n%d ==> %d\n", id, (int)err);
-		if (err != 0x09 && err != 0x0A) {
+		if (err != 0x09 and err != 0x0A) {
 			// 0x09: eRTU_RECV_ERROR
 			// oxoA: eRTU_MEMORY_ERROR
 			_active_device.emplace_back();
@@ -770,7 +771,7 @@ void Modbus_Manager::scanDevice(uint8_t port, uint8_t min_id, uint8_t max_id) {
 		                               &data,
 		                               1);
 		// HAL.printf("\n%d ==> %d\n", id, (int)err);
-		if (err != 0x09 && err != 0x0A) {
+		if (err != 0x09 and err != 0x0A) {
 			// 0x09: eRTU_RECV_ERROR
 			// oxoA: eRTU_MEMORY_ERROR
 			_active_device.emplace_back();

@@ -29,11 +29,28 @@
       "Bash(npx vite:*)",
       "Bash(sed:*)",
       "Bash(git diff:*)",
-      "Bash(python doc_script/generate_i2c_sensor_list.py:*)",
       "Bash(python3:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(do)",
+      "Bash(if [ -f \"$file\" ])",
+      "Bash(then)",
+      "Bash(echo:*)",
+      "Bash(fi)",
+      "Bash(done)",
+      "Bash(git checkout:*)",
+      "Bash(git status:*)",
+      "Bash(tree:*)",
+      "Bash(wc:*)"
     ],
-    "deny": [],
+    "deny": [
+      "Read(./output/**)",
+      "Read(./libraries/**)",
+      "Read(./build/cache/**)",
+      "Read(./build/output/**)",
+      "Read(./build/boot_app0.bin)",
+      "Read(./.vscode/**)",
+      "Read(**/__pycache__/**)"
+    ],
     "defaultMode": "acceptEdits"
   }
 }

@@ -18,14 +18,17 @@ Supported device
 - M5Stick C Plus
 - M5Stick C Plus2
 - M5Paper
-- [M5PaperS3 (need EPDiy library) ](docs/M5PaperS3.md)
+- M5PaperS3
 - M5Tough
 - M5Station
 - M5ATOMS3 / ATOMS3R
 - M5Dial
 - M5DinMeter
 - M5Cardputer
+- M5CardputerADV
 - M5VAMeter
+- M5Tab5
+- ArduinoNessoN1
 - UnitOLED
 - UnitMiniOLED
 - UnitLCD

@@ -28,8 +28,13 @@ namespace lgfx // This should not be changed to "m5gfx"
     , board_M5PaperS3
     , board_M5CoreMP135
     , board_M5StampPLC
+    , board_M5Tab5
+    , board_ArduinoNessoN1
+    , board_M5CardputerADV
+    , board_M5UnitC6L
+    , board_M5StickS3
 
-/// non display boards 
+/// non display boards
     , board_M5AtomLite = 128
     , board_M5ATOM __attribute__ ((deprecated)) = board_M5AtomLite
     , board_M5Atom __attribute__ ((deprecated)) = board_M5AtomLite
@@ -49,6 +54,9 @@ namespace lgfx // This should not be changed to "m5gfx"
     , board_M5AtomEcho
     , board_M5AtomS3RExt
     , board_M5AtomS3RCam
+    , board_M5AtomEchoS3R
+    , board_M5PowerHub
+    , board_M5DualKey
 
 /// external displays
     , board_M5AtomDisplay = 192

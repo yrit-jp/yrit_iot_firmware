@@ -302,7 +302,7 @@ namespace lgfx
     LGFX_INLINE_T void clear       ( const T& color) { setBaseColor(color); clearDisplay(); }
     LGFX_INLINE   void clear       ( void )          { clearDisplay(); }
     LGFX_INLINE_T void clearDisplay( const T& color) { setBaseColor(color); clearDisplay(); }
-    LGFX_INLINE   void clearDisplay( void )          { if (isEPD()) { fillScreen(~_base_rgb888); } fillScreen(_base_rgb888); }
+    LGFX_INLINE   void clearDisplay( void )          { if (isEPD()) { waitDisplay(); fillScreen(~_base_rgb888); waitDisplay(); } fillScreen(_base_rgb888); }
 
     LGFX_INLINE   void  setPivot(float x, float y) { _xpivot = x; _ypivot = y; }
     LGFX_INLINE   float getPivotX(void) const { return _xpivot; }
@@ -1091,6 +1091,7 @@ namespace lgfx
       else
       {
         if (     dst_depth == rgb565_2Byte) { pc.fp_copy = pixelcopy_t::copy_rgb_fast<swap565_t, T>; }
+        else if (dst_depth == rgb565_nonswapped) { pc.fp_copy = pixelcopy_t::copy_rgb_fast<rgb565_t, T>; }
         else if (dst_depth == rgb332_1Byte) { pc.fp_copy = pixelcopy_t::copy_rgb_fast<rgb332_t, T>; }
         else                                { pc.fp_copy = pixelcopy_t::copy_rgb_fast<grayscale_t, T>; }
       }

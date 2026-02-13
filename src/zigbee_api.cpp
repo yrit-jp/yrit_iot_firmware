@@ -30,7 +30,7 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 	frame.idx++;
 
 	tmp = (frame.data_len >> 8);
-	if (tmp == 0x7E || tmp == 0x7D) {
+	if (tmp == 0x7E or tmp == 0x7D) {
 		frame.packet[frame.idx] = 0x7D;
 		frame.idx++;
 		frame.packet[frame.idx] = tmp ^ 0x20;
@@ -40,7 +40,7 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 	}
 	frame.idx++;
 	tmp = (frame.data_len & 0xFF);
-	if (tmp == 0x7E || tmp == 0x7D) {
+	if (tmp == 0x7E or tmp == 0x7D) {
 		frame.packet[frame.idx] = 0x7D;
 		frame.idx++;
 		frame.packet[frame.idx] = tmp ^ 0x20;
@@ -51,23 +51,39 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 	frame.idx++;
 
 	for (int i = 0; i < frame.data_len; i++) {
-		if (payload[i] == 0x7E || payload[i] == 0x7D) {
+		if (payload[i] == 0x7E or payload[i] == 0x7D) {
+			if (frame.idx + 1 >= ZIGBEE_API_MAX_FRAME_SIZE) {
+				HAL.println("[Error] Frame buffer overflow (escape in payload)");
+				return ZAS_SEND_ERROR;
+			}
 			frame.packet[frame.idx] = 0x7D;
 			frame.idx++;
 			frame.packet[frame.idx] = payload[i] ^ 0x20;
 			frame.frame_len++;
 		} else {
+			if (frame.idx >= ZIGBEE_API_MAX_FRAME_SIZE) {
+				HAL.println("[Error] Frame buffer overflow (payload)");
+				return ZAS_SEND_ERROR;
+			}
 			frame.packet[frame.idx] = payload[i];
 		}
 		frame.idx++;
 	}
 
-	if (checksum == 0x7E || checksum == 0x7D) {
+	if (checksum == 0x7E or checksum == 0x7D) {
+		if (frame.idx + 1 >= ZIGBEE_API_MAX_FRAME_SIZE) {
+			HAL.println("[Error] Frame buffer overflow (escape in checksum)");
+			return ZAS_SEND_ERROR;
+		}
 		frame.packet[frame.idx] = 0x7D;
 		frame.idx++;
 		frame.packet[frame.idx] = checksum ^ 0x20;
 		frame.frame_len++;
 	} else {
+		if (frame.idx >= ZIGBEE_API_MAX_FRAME_SIZE) {
+			HAL.println("[Error] Frame buffer overflow (checksum)");
+			return ZAS_SEND_ERROR;
+		}
 		frame.packet[frame.idx] = checksum;
 	}
 
@@ -93,7 +109,7 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 		// 最大送信容量単位で送信
 		int i = 0;
 		for (i = 0; i < (frame.frame_len / HAL_BLE_TX_SIZE); i++) {
-			while (!HAL.Ble.txReady()) {
+			while (not HAL.Ble.txReady()) {
 				HAL.delay(15);
 
 				if ((millis() - previous) > TIMEOUT_MS) {
@@ -108,7 +124,7 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 		}
 
 		// 残りのデータを送信
-		while (!HAL.Ble.txReady()) {
+		while (not HAL.Ble.txReady()) {
 			HAL.delay(15);
 
 			if ((millis() - previous) > TIMEOUT_MS) {
@@ -128,7 +144,7 @@ enum ZigbeeApiStatus SettingBT::send(const char *payload, unsigned int size) {
 
 enum ZigbeeApiStatus SettingBT::update() {
 	if (HAL.Ble.available() == 0) {
-		if (frame.status == ZAS_COMPLETE || frame.status == ZAS_INVALID_CHECKSUM) {
+		if (frame.status == ZAS_COMPLETE or frame.status == ZAS_INVALID_CHECKSUM) {
 			frame.status = ZAS_WAIT;
 		}
 		return frame.status;

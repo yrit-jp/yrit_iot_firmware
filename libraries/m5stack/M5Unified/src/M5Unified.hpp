@@ -43,21 +43,27 @@ namespace m5
     sd_spi_cs,     sd_spi_ss  = sd_spi_cs,
     rgb_led,
     power_hold,
+    mbus_pin1, mbus_pin2, mbus_pin3, mbus_pin4, mbus_pin5,
+    mbus_pin6, mbus_pin7, mbus_pin8, mbus_pin9, mbus_pin10,
+    mbus_pin11, mbus_pin12, mbus_pin13, mbus_pin14, mbus_pin15,
+    mbus_pin16, mbus_pin17, mbus_pin18, mbus_pin19, mbus_pin20,
+    mbus_pin21, mbus_pin22, mbus_pin23, mbus_pin24, mbus_pin25,
+    mbus_pin26, mbus_pin27, mbus_pin28, mbus_pin29, mbus_pin30,
     pin_name_max,
   };
 };
 
 #include "gitTagVersion.h"
-#include "utility/RTC8563_Class.hpp"
-#include "utility/AXP192_Class.hpp"
-#include "utility/IP5306_Class.hpp"
+#include "utility/RTC_Class.hpp"
 #include "utility/Button_Class.hpp"
 #include "utility/Power_Class.hpp"
 #include "utility/Speaker_Class.hpp"
 #include "utility/Mic_Class.hpp"
 #include "utility/Touch_Class.hpp"
 #include "utility/Log_Class.hpp"
+#include "utility/LED_Class.hpp"
 #include "utility/IMU_Class.hpp"
+#include "utility/IOExpander_Base.hpp"
 
 #include <memory>
 #include <vector>
@@ -65,6 +71,11 @@ namespace m5
 namespace m5
 {
   using touch_detail_t = Touch_Class::touch_detail_t;
+
+  // RTC8563_Class has been discontinued and replaced with RTC_Class.
+  // This is a temporary measure for derived libraries. (e.g.M5DinMeter)
+  // deprecated but kept for backward compatibility.
+  using RTC8563_Class = RTC_Class;
 
   class M5Unified
   {
@@ -151,6 +162,8 @@ namespace m5
                              = board_t::board_M5AtomS3Lite;
 #elif defined (CONFIG_IDF_TARGET_ESP32C3)
                              = board_t::board_M5StampC3;
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+                             = board_t::board_M5Tab5;
 #elif defined (CONFIG_IDF_TARGET_ESP32) || !defined (CONFIG_IDF_TARGET)
                              = board_t::board_M5AtomLite;
 #else
@@ -205,8 +218,11 @@ namespace m5
     IMU_Class Imu;
     Log_Class Log;
     Power_Class Power;
-    RTC8563_Class Rtc;
+    RTC_Class Rtc;
     Touch_Class Touch;
+    Speaker_Class Speaker;
+    Mic_Class Mic;
+    LED_Class Led;
 
 /*
   /// List of available buttons:
@@ -231,9 +247,6 @@ namespace m5
     /// for external I2C device (Port.A)
     I2C_Class& Ex_I2C = m5::Ex_I2C;
 
-    Speaker_Class Speaker;
-
-    Mic_Class Mic;
 
     static int8_t getPin(pin_name_t name) { return _get_pin_table[name]; }
 
@@ -314,7 +327,9 @@ namespace m5
     }
 
     /// Perform initialization process at startup.
-    virtual void begin(config_t cfg)
+    /// ※ This method must not be "virtual"
+    /// (the definition of config_t may differ between compilations, which could result in memory corruption).
+    void begin(config_t cfg)
     {
       // Allow begin execution only once.
       if (_board != m5gfx::board_t::board_unknown) { return; }
@@ -333,6 +348,7 @@ namespace m5
       _board = board;
       _setup_pinmap(board);
       _setup_i2c(board);
+      _setup_led(board);
       if (res && getDisplayCount() == 0) {
         addDisplay(Display);
       }
@@ -340,7 +356,7 @@ namespace m5
 #if defined ( __M5GFX_M5ATOMDISPLAY__ )
       if (cfg.external_display.atom_display) {
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
-        if (_board == board_t::board_M5AtomS3 || _board == board_t::board_M5AtomS3Lite || _board == board_t::board_M5AtomS3R || _board == board_t::board_M5AtomS3RCam || _board == board_t::board_M5AtomS3RExt)
+        if (_board == board_t::board_M5AtomS3 || _board == board_t::board_M5AtomS3Lite || _board == board_t::board_M5AtomS3R || _board == board_t::board_M5AtomS3RCam || _board == board_t::board_M5AtomS3RExt || _board == board_t::board_M5AtomEchoS3R)
 #elif !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32)
         if (_board == board_t::board_M5AtomLite || _board == board_t::board_M5AtomMatrix || _board == board_t::board_M5AtomEcho || _board == board_t::board_M5AtomPsram)
 #else
@@ -360,10 +376,16 @@ namespace m5
 
       // Module Display / Unit OLED / Unit LCD is determined after _begin (because it must be after external power supply)
 #if defined ( __M5GFX_M5MODULEDISPLAY__ )
-#if !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32) || defined (CONFIG_IDF_TARGET_ESP32S3)
       if (cfg.external_display.module_display) {
-        if (_board == board_t::board_M5Stack || _board == board_t::board_M5StackCore2 || _board == board_t::board_M5Tough
-         || _board == board_t::board_M5StackCoreS3 || _board == board_t::board_M5StackCoreS3SE)
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+        if (_board == board_t::board_M5Tab5)
+#elif defined (CONFIG_IDF_TARGET_ESP32S3)
+        if (_board == board_t::board_M5StackCoreS3 || _board == board_t::board_M5StackCoreS3SE)
+#elif !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32)
+        if (_board == board_t::board_M5Stack || _board == board_t::board_M5StackCore2 || _board == board_t::board_M5Tough)
+#else
+        if (false)
+#endif
         {
           M5ModuleDisplay dsp(cfg.module_display);
           if (dsp.init()) {
@@ -371,7 +393,6 @@ namespace m5
           }
         }
       }
-#endif
 #endif
 
       // Speaker selection is performed after the Module Display has been determined.
@@ -382,21 +403,38 @@ namespace m5
       bool port_a_used = _begin_rtc_imu(cfg);
       (void)port_a_used;
 
+#if defined (ESP_PLATFORM)
+      const uint_fast8_t ex_i2c_sda = Ex_I2C.getSDA();
+      const uint_fast8_t ex_i2c_scl = Ex_I2C.getSCL();
+      const int_fast8_t ex_i2c_port = Ex_I2C.getPort();
+      const bool ex_i2c_enabled = (ex_i2c_sda < GPIO_NUM_MAX && ex_i2c_scl < GPIO_NUM_MAX && ex_i2c_port >= 0);
+#else
+      const bool ex_i2c_enabled = true;
+#endif
+      (void)ex_i2c_enabled;
+
       if (cfg.external_display_value)
       {
 #if defined ( __M5GFX_M5UNITOLED__ )
         if (cfg.external_display.unit_oled)
         {
 #if defined (ESP_PLATFORM)
-          if (cfg.unit_oled.pin_sda >= GPIO_NUM_MAX) { cfg.unit_oled.pin_sda = (uint8_t)Ex_I2C.getSDA(); }
-          if (cfg.unit_oled.pin_scl >= GPIO_NUM_MAX) { cfg.unit_oled.pin_scl = (uint8_t)Ex_I2C.getSCL(); }
-          if (cfg.unit_oled.i2c_port < 0) { cfg.unit_oled.i2c_port = (int8_t)Ex_I2C.getPort(); }
+          if (ex_i2c_enabled)
+          {
+            if (cfg.unit_oled.pin_sda >= GPIO_NUM_MAX) { cfg.unit_oled.pin_sda = ex_i2c_sda; }
+            if (cfg.unit_oled.pin_scl >= GPIO_NUM_MAX) { cfg.unit_oled.pin_scl = ex_i2c_scl; }
+            if (cfg.unit_oled.i2c_port < 0) { cfg.unit_oled.i2c_port = ex_i2c_port; }
+          }
+          if (cfg.unit_oled.pin_sda < GPIO_NUM_MAX
+           && cfg.unit_oled.pin_scl < GPIO_NUM_MAX
+           && cfg.unit_oled.i2c_port >= 0)
 #endif
-
-          M5UnitOLED dsp(cfg.unit_oled);
-          if (dsp.init()) {
-            addDisplay(dsp);
-            port_a_used = true;
+          {
+            M5UnitOLED dsp(cfg.unit_oled);
+            if (dsp.init()) {
+              addDisplay(dsp);
+              port_a_used = true;
+            }
           }
         }
 #endif
@@ -405,15 +443,22 @@ namespace m5
         if (cfg.external_display.unit_mini_oled)
         {
 #if defined (ESP_PLATFORM)
-          if (cfg.unit_mini_oled.pin_sda >= GPIO_NUM_MAX) { cfg.unit_mini_oled.pin_sda = (uint8_t)Ex_I2C.getSDA(); }
-          if (cfg.unit_mini_oled.pin_scl >= GPIO_NUM_MAX) { cfg.unit_mini_oled.pin_scl = (uint8_t)Ex_I2C.getSCL(); }
-          if (cfg.unit_mini_oled.i2c_port < 0) { cfg.unit_mini_oled.i2c_port = (int8_t)Ex_I2C.getPort(); }
+          if (ex_i2c_enabled)
+          {
+            if (cfg.unit_mini_oled.pin_sda >= GPIO_NUM_MAX) { cfg.unit_mini_oled.pin_sda = ex_i2c_sda; }
+            if (cfg.unit_mini_oled.pin_scl >= GPIO_NUM_MAX) { cfg.unit_mini_oled.pin_scl = ex_i2c_scl; }
+            if (cfg.unit_mini_oled.i2c_port < 0) { cfg.unit_mini_oled.i2c_port = ex_i2c_port; }
+          }
+          if (cfg.unit_mini_oled.pin_sda < GPIO_NUM_MAX
+           && cfg.unit_mini_oled.pin_scl < GPIO_NUM_MAX
+           && cfg.unit_mini_oled.i2c_port >= 0)
 #endif
-
-          M5UnitMiniOLED dsp(cfg.unit_mini_oled);
-          if (dsp.init()) {
-            addDisplay(dsp);
-            port_a_used = true;
+          {
+            M5UnitMiniOLED dsp(cfg.unit_mini_oled);
+            if (dsp.init()) {
+              addDisplay(dsp);
+              port_a_used = true;
+            }
           }
         }
 #endif
@@ -422,15 +467,22 @@ namespace m5
         if (cfg.external_display.unit_glass)
         {
 #if defined (ESP_PLATFORM)
-          if (cfg.unit_glass.pin_sda >= GPIO_NUM_MAX) { cfg.unit_glass.pin_sda = (uint8_t)Ex_I2C.getSDA(); }
-          if (cfg.unit_glass.pin_scl >= GPIO_NUM_MAX) { cfg.unit_glass.pin_scl = (uint8_t)Ex_I2C.getSCL(); }
-          if (cfg.unit_glass.i2c_port < 0) { cfg.unit_glass.i2c_port = (int8_t)Ex_I2C.getPort(); }
+          if (ex_i2c_enabled)
+          {
+            if (cfg.unit_glass.pin_sda >= GPIO_NUM_MAX) { cfg.unit_glass.pin_sda = ex_i2c_sda; }
+            if (cfg.unit_glass.pin_scl >= GPIO_NUM_MAX) { cfg.unit_glass.pin_scl = ex_i2c_scl; }
+            if (cfg.unit_glass.i2c_port < 0) { cfg.unit_glass.i2c_port = ex_i2c_port; }
+          }
+          if (cfg.unit_glass.pin_sda < GPIO_NUM_MAX
+           && cfg.unit_glass.pin_scl < GPIO_NUM_MAX
+           && cfg.unit_glass.i2c_port >= 0)
 #endif
-
-          M5UnitGLASS dsp(cfg.unit_glass);
-          if (dsp.init()) {
-            addDisplay(dsp);
-            port_a_used = true;
+          {
+            M5UnitGLASS dsp(cfg.unit_glass);
+            if (dsp.init()) {
+              addDisplay(dsp);
+              port_a_used = true;
+            }
           }
         }
 #endif
@@ -439,15 +491,22 @@ namespace m5
         if (cfg.external_display.unit_glass2)
         {
 #if defined (ESP_PLATFORM)
-          if (cfg.unit_glass2.pin_sda >= GPIO_NUM_MAX) { cfg.unit_glass2.pin_sda = (uint8_t)Ex_I2C.getSDA(); }
-          if (cfg.unit_glass2.pin_scl >= GPIO_NUM_MAX) { cfg.unit_glass2.pin_scl = (uint8_t)Ex_I2C.getSCL(); }
-          if (cfg.unit_glass2.i2c_port < 0) { cfg.unit_glass2.i2c_port = (int8_t)Ex_I2C.getPort(); }
+          if (ex_i2c_enabled)
+          {
+            if (cfg.unit_glass2.pin_sda >= GPIO_NUM_MAX) { cfg.unit_glass2.pin_sda = ex_i2c_sda; }
+            if (cfg.unit_glass2.pin_scl >= GPIO_NUM_MAX) { cfg.unit_glass2.pin_scl = ex_i2c_scl; }
+            if (cfg.unit_glass2.i2c_port < 0) { cfg.unit_glass2.i2c_port = ex_i2c_port; }
+          }
+          if (cfg.unit_glass2.pin_sda < GPIO_NUM_MAX
+           && cfg.unit_glass2.pin_scl < GPIO_NUM_MAX
+           && cfg.unit_glass2.i2c_port >= 0)
 #endif
-
-          M5UnitGLASS2 dsp(cfg.unit_glass2);
-          if (dsp.init()) {
-            addDisplay(dsp);
-            port_a_used = true;
+          {
+            M5UnitGLASS2 dsp(cfg.unit_glass2);
+            if (dsp.init()) {
+              addDisplay(dsp);
+              port_a_used = true;
+            }
           }
         }
 #endif
@@ -456,21 +515,28 @@ namespace m5
         if (cfg.external_display.unit_lcd)
         {
 #if defined (ESP_PLATFORM)
-          if (cfg.unit_lcd.pin_sda >= GPIO_NUM_MAX) { cfg.unit_lcd.pin_sda = (uint8_t)Ex_I2C.getSDA(); }
-          if (cfg.unit_lcd.pin_scl >= GPIO_NUM_MAX) { cfg.unit_lcd.pin_scl = (uint8_t)Ex_I2C.getSCL(); }
-          if (cfg.unit_lcd.i2c_port < 0) { cfg.unit_lcd.i2c_port = (int8_t)Ex_I2C.getPort(); }
+          if (ex_i2c_enabled)
+          {
+            if (cfg.unit_lcd.pin_sda >= GPIO_NUM_MAX) { cfg.unit_lcd.pin_sda = ex_i2c_sda; }
+            if (cfg.unit_lcd.pin_scl >= GPIO_NUM_MAX) { cfg.unit_lcd.pin_scl = ex_i2c_scl; }
+            if (cfg.unit_lcd.i2c_port < 0) { cfg.unit_lcd.i2c_port = ex_i2c_port; }
+          }
+          if (cfg.unit_lcd.pin_sda < GPIO_NUM_MAX
+           && cfg.unit_lcd.pin_scl < GPIO_NUM_MAX
+           && cfg.unit_lcd.i2c_port >= 0)
 #endif
-
-          M5UnitLCD dsp(cfg.unit_lcd);
-          int retry = 8;
-          do {
-            m5gfx::delay(32);
-            if (dsp.init()) {
-              addDisplay(dsp);
-              port_a_used = true;
-              break;
-            }
-          } while (--retry);
+          {
+            M5UnitLCD dsp(cfg.unit_lcd);
+            int retry = 8;
+            do {
+              m5gfx::delay(32);
+              if (dsp.init()) {
+                addDisplay(dsp);
+                port_a_used = true;
+                break;
+              }
+            } while (--retry);
+          }
         }
 #endif
 
@@ -534,19 +600,23 @@ namespace m5
     void setTouchButtonHeight(uint16_t pixel) { _touch_button_height = pixel; }
     uint16_t getTouchButtonHeight(void) const { return _touch_button_height; }
 
+    IOExpander_Base& getIOExpander(size_t idx) { return *_io_expander[idx & 1]; };
+
   private:
     static constexpr std::size_t BTNPWR_MIN_UPDATE_MSEC = 4;
 
     Button_Class _buttons[5];
 
-    std::vector<M5GFX> _displays; // 登録された全ディスプレイのインスタンス
+     // Instances of all registered displays
+    std::vector<M5GFX> _displays;
+    std::unique_ptr<IOExpander_Base> _io_expander[2];
+
     std::uint32_t _updateMsec = 0;
     std::uint16_t _touch_button_height = 0;
     m5gfx::board_t _board = m5gfx::board_t::board_unknown;
 
     std::uint8_t _primary_display_index = -1;
-    bool use_pmic_button = false;
-    bool use_hat_spk = false;
+    bool _use_pmic_button = false;
 
     void _begin(const config_t& cfg);
     void _begin_spk(config_t& cfg);
@@ -554,15 +624,22 @@ namespace m5
 
     board_t _check_boardtype(board_t);
     void _setup_i2c(board_t);
+    void _setup_led(board_t);
 
     static void _setup_pinmap(board_t);
     static bool _speaker_enabled_cb_core2(void* args, bool enabled);
     static bool _speaker_enabled_cb_cores3(void* args, bool enabled);
     static bool _speaker_enabled_cb_hat_spk(void* args, bool enabled);
     static bool _speaker_enabled_cb_atomic_echo(void* args, bool enabled);
+    static bool _speaker_enabled_cb_tab5(void* args, bool enabled);
+    static bool _speaker_enabled_cb_cardputer_adv(void* args, bool enabled);
     static bool _microphone_enabled_cb_stickc(void* args, bool enabled);
     static bool _microphone_enabled_cb_cores3(void* args, bool enabled);
     static bool _microphone_enabled_cb_atomic_echo(void* args, bool enabled);
+    static bool _microphone_enabled_cb_atom_echos3r(void* args, bool enabled);
+    static bool _speaker_enabled_cb_atom_echos3r(void* args, bool enabled);
+    static bool _microphone_enabled_cb_tab5(void* args, bool enabled);
+    static bool _microphone_enabled_cb_cardputer_adv(void* args, bool enabled);
 
     static int8_t _get_pin_table[pin_name_max];
   };

@@ -63,11 +63,13 @@ void process_command(const String &string_buffer, Ezo_board* device_list[], uint
     if (index != -1) {                                              //if it contains a colon character
       bool addr_found = false;
       String name_to_find = string_buffer.substring(0, index);              //get the address out of the command
-      name_to_find.toUpperCase();
+	  int address = name_to_find.toInt();				//convert address to an integer
+      name_to_find.toUpperCase();						//get the name if we're looking for it instead
       if (name_to_find.length() != 0) {                                              //if its valid
         //search through list and make device match the address
         for (uint8_t i = 0; i < device_list_len; i++) {
-          if (name_to_find == device_list[i]->get_name()) {               //if the address matches one of the boards in the list
+          if ((name_to_find == device_list[i]->get_name()) 
+					|| (address == device_list[i]->get_address()) ) {   //if the address matches one of the boards in the list
             default_board = device_list[i];                        //set that board as the default
             addr_found = true;                                      //indicate we changed the address
             break;                                                  //and exit the loop
@@ -87,10 +89,11 @@ void process_command(const String &string_buffer, Ezo_board* device_list[], uint
     else {                                                          //if theres no colon just pass the command to the default board
       default_board->send_cmd(string_buffer.c_str());
     }
+	if(string_buffer != "SLEEP"){
+		select_delay(string_buffer);                                   //wait for some time depending on the command
 
-    select_delay(string_buffer);                                   //wait for some time depending on the command
-
-    receive_and_print_response(*default_board);
+		receive_and_print_response(*default_board);
+	}
   }
 }
 

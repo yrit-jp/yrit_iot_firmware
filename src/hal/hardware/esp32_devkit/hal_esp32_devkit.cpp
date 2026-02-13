@@ -124,9 +124,20 @@ uint8_t HAL_API::BtnC_isPressed() {
 
 void HAL_API::endSetup() {
 	// BT の停止とメモリ解放
-	esp_bt_controller_disable();
-	esp_bt_controller_deinit();
-	esp_bt_mem_release(ESP_BT_MODE_BTDM);
+	::esp_bt_controller_disable();
+	::esp_bt_controller_deinit();
+	::esp_bt_mem_release(ESP_BT_MODE_BTDM);
+
+	// WatchDog Timer の再初期化
+	constexpr uint16_t WDT_TIMEOUT_SEC = 120;
+	esp_task_wdt_config_t wdt_config   = {
+	      .timeout_ms     = WDT_TIMEOUT_SEC * 1000,
+	      .idle_core_mask = 0, // Bitmask of cores
+	      .trigger_panic  = true};
+	::esp_task_wdt_deinit();
+	::esp_task_wdt_init(&wdt_config);
+
+	::enableLoopWDT(); // Loop タスクの WatchDog Timer を有効化
 }
 
 int8_t HAL_API::getBatteryLevel() {
@@ -134,6 +145,14 @@ int8_t HAL_API::getBatteryLevel() {
 	int8_t bat_level = std::max((voltage - 2.4) / (3.3 - 2.4), 0.0);
 	bat_level        = (bat_level > 100) ? 100 : bat_level;
 	return bat_level;
+}
+
+uint32_t HAL_API::getFreeHeapSize() {
+	return xPortGetFreeHeapSize();
+}
+
+uint32_t HAL_API::getMinimumFreeHeapSize() {
+	return xPortGetMinimumEverFreeHeapSize();
 }
 
 uint32_t HAL_API::getRandomNumber(uint32_t minimum, uint32_t maximum) {
@@ -166,7 +185,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 }
 
 void HAL_API::delay(uint32_t ms) {
-	::esp_task_wdt_reset();
+	//::esp_task_wdt_reset();
 	::delay(ms);
 }
 
@@ -288,42 +307,42 @@ void HAL_Timer_API::begin(uint32_t interval_ms) {
 	case TIM_0:
 		// Create semaphore to inform us when the timer has fired
 		timer0_Semaphore = xSemaphoreCreateBinary();
-		// timer, count 1 micro sec, autoReload
-		timer0 = timerBegin(_timer_num, getApbFrequency() / 1000000, true);
-		// timer, interrupt function, edge trigger
-		timerAttachInterrupt(timer0, onTimer0, true);
-		// timer, interrupt interval, autoReload
-		timerAlarmWrite(timer0, interval_ms * 1000, true);
+		// timer frequency 1MHz (1 micro sec)
+		timer0 = timerBegin(1000000);
+		// timer, interrupt function
+		timerAttachInterrupt(timer0, onTimer0);
+		// timer, interrupt interval, autoReload, reload count
+		timerAlarm(timer0, interval_ms * 1000, true, 0);
 		break;
 	case TIM_1:
 		// Create semaphore to inform us when the timer has fired
 		timer1_Semaphore = xSemaphoreCreateBinary();
-		// timer, count 1 micro sec, autoReload
-		timer1 = timerBegin(_timer_num, getApbFrequency() / 1000000, true);
-		// timer, interrupt function, edge trigger
-		timerAttachInterrupt(timer1, onTimer1, true);
-		// timer, interrupt interval, autoReload
-		timerAlarmWrite(timer1, interval_ms * 1000, true);
+		// timer frequency 1MHz (1 micro sec)
+		timer1 = timerBegin(1000000);
+		// timer, interrupt function
+		timerAttachInterrupt(timer1, onTimer1);
+		// timer, interrupt interval, autoReload, reload count
+		timerAlarm(timer1, interval_ms * 1000, true, 0);
 		break;
 	case TIM_2:
 		// Create semaphore to inform us when the timer has fired
 		timer2_Semaphore = xSemaphoreCreateBinary();
-		// timer, count 1 micro sec, autoReload
-		timer2 = timerBegin(_timer_num, getApbFrequency() / 1000000, true);
-		// timer, interrupt function, edge trigger
-		timerAttachInterrupt(timer2, onTimer2, true);
-		// timer, interrupt interval, autoReload
-		timerAlarmWrite(timer2, interval_ms * 1000, true);
+		// timer frequency 1MHz (1 micro sec)
+		timer2 = timerBegin(1000000);
+		// timer, interrupt function
+		timerAttachInterrupt(timer2, onTimer2);
+		// timer, interrupt interval, autoReload, reload count
+		timerAlarm(timer2, interval_ms * 1000, true, 0);
 		break;
 	case TIM_3:
 		// Create semaphore to inform us when the timer has fired
 		timer3_Semaphore = xSemaphoreCreateBinary();
-		// timer, count 1 micro sec, autoReload
-		timer3 = timerBegin(_timer_num, getApbFrequency() / 1000000, true);
-		// timer, interrupt function, edge trigger
-		timerAttachInterrupt(timer3, onTimer3, true);
-		// timer, interrupt interval, autoReload
-		timerAlarmWrite(timer3, interval_ms * 1000, true);
+		// timer frequency 1MHz (1 micro sec)
+		timer3 = timerBegin(1000000);
+		// timer, interrupt function
+		timerAttachInterrupt(timer3, onTimer3);
+		// timer, interrupt interval, autoReload, reload count
+		timerAlarm(timer3, interval_ms * 1000, true, 0);
 		break;
 	default:
 		return;
@@ -464,7 +483,7 @@ void HAL_Timer_API::start(bool enable_first_interrupt) {
 			return;
 		}
 		timerRestart(timer0);
-		timerAlarmEnable(timer0); // Enable timer interrupt
+		timerStart(timer0); // Enable timer interrupt
 		if (enable_first_interrupt) {
 			xSemaphoreGive(timer0_Semaphore); // for first time interrupt
 		}
@@ -474,7 +493,7 @@ void HAL_Timer_API::start(bool enable_first_interrupt) {
 			return;
 		}
 		timerRestart(timer1);
-		timerAlarmEnable(timer1); // Enable timer interrupt
+		timerStart(timer1); // Enable timer interrupt
 		if (enable_first_interrupt) {
 			xSemaphoreGive(timer1_Semaphore); // for first time interrupt
 		}
@@ -484,7 +503,7 @@ void HAL_Timer_API::start(bool enable_first_interrupt) {
 			return;
 		}
 		timerRestart(timer2);
-		timerAlarmEnable(timer2); // Enable timer interrupt
+		timerStart(timer2); // Enable timer interrupt
 		if (enable_first_interrupt) {
 			xSemaphoreGive(timer2_Semaphore); // for first time interrupt
 		}
@@ -494,7 +513,7 @@ void HAL_Timer_API::start(bool enable_first_interrupt) {
 			return;
 		}
 		timerRestart(timer3);
-		timerAlarmEnable(timer3); // Enable timer interrupt
+		timerStart(timer3); // Enable timer interrupt
 		if (enable_first_interrupt) {
 			xSemaphoreGive(timer3_Semaphore); // for first time interrupt
 		}
@@ -571,7 +590,7 @@ bool HAL_WLAN_API::config(String ip, String gateway, String subnet, String dns1,
 		return false;
 	}
 
-	if (_dns1.fromString(dns1) == false && _dns2.fromString(dns2) == false) {
+	if (_dns1.fromString(dns1) == false and _dns2.fromString(dns2) == false) {
 		// dns option mode
 		return WiFi.config(_ip, _gateway, _subnet);
 	} else {
@@ -588,10 +607,10 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 		return true;
 	}
 
-	if (!_ap_name.equals(ap_name)) {
+	if (not _ap_name.equals(ap_name)) {
 		_ap_name = ap_name;
 	}
-	if (!_pass.equals(pass)) {
+	if (not _pass.equals(pass)) {
 		_pass = pass;
 	}
 
@@ -601,7 +620,7 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 	WiFi.begin(_ap_name.c_str(), _pass.c_str());
 
 	unsigned long start = millis();
-	while (result != WL_CONNECTED && (millis() - start) < (timeout_ms)) {
+	while (result != WL_CONNECTED and (millis() - start) < (timeout_ms)) {
 		result = WiFi.status();
 		delay(500);
 	}
@@ -646,7 +665,7 @@ MyIPAddress HAL_WLAN_API::resolveMDNS(String host, uint8_t try_count) {
 
 	String mdns_name = HAL.getChipUUID();
 
-	if (!MDNS.begin(mdns_name.c_str())) {
+	if (not MDNS.begin(mdns_name.c_str())) {
 		// Failed to begin MDNS server
 		HAL.println("[mDNS] (Error) Failed to initialize mDNS responder");
 		return MyIPAddress(invalid_ip[0], invalid_ip[1], invalid_ip[2], invalid_ip[3]);
@@ -708,7 +727,7 @@ bool HAL_NTP_RTC_API::begin() {
 	for (int i = 0; i < servers.size(); i++) {
 		configTzTime(time_zone.c_str(), servers[i].c_str());
 		// delay(1000);
-		if (!getLocalTime(&timeinfo, TIMEOUT_MS)) {
+		if (not getLocalTime(&timeinfo, TIMEOUT_MS)) {
 			// Failed to fetch
 			continue;
 		}
@@ -728,14 +747,14 @@ bool HAL_NTP_RTC_API::update() {
 	struct tm timeinfo;
 	bool result = false;
 	configTzTime(time_zone.c_str(), selected_ntp_server.c_str());
-	if (!getLocalTime(&timeinfo)) {
+	if (not getLocalTime(&timeinfo)) {
 		return begin();
 	}
 	return true;
 }
 
 bool HAL_NTP_RTC_API::getCurrentTime(struct tm *timeinfo) {
-	if (!getLocalTime(timeinfo)) {
+	if (not getLocalTime(timeinfo)) {
 		return false;
 	}
 	return true;
@@ -762,9 +781,11 @@ void HAL_LED_API::begin() {
 	_brightness.max   = 0; // light when pin L
 	_brightness.min   = _brightness.limit;
 
-	ledcSetup(_ch, _freq, _res);
-	ledcAttachPin(_pin, _ch);
-	ledcWrite(_ch, _brightness.min);
+	ledcAttachChannel(_pin, _freq, _res, _ch);
+	ledcWrite(_pin, _brightness.min);
+	// ledcSetup(_ch, _freq, _res);
+	// ledcAttachPin(_pin, _ch);
+	// ledcWrite(_ch, _brightness.min);
 	_current_led_state = false;
 }
 
@@ -776,12 +797,12 @@ void HAL_LED_API::setBrightnessLevel(double percentage) {
 }
 
 void HAL_LED_API::on() {
-	ledcWrite(_ch, _brightness.max);
+	ledcWrite(_pin, _brightness.max);
 	_current_led_state = true;
 }
 
 void HAL_LED_API::off() {
-	ledcWrite(_ch, _brightness.min);
+	ledcWrite(_pin, _brightness.min);
 	_current_led_state = false;
 }
 
@@ -800,7 +821,7 @@ void HAL_LED_API::toggle() {
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
-	if (!SPIFFS.begin(true)) {
+	if (not SPIFFS.begin(true)) {
 		HAL.println("Failed to begin SPIFFS.");
 		return false;
 	}
@@ -809,7 +830,7 @@ bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
 	serializeJson(json, tmpl);
 
 	File f = SPIFFS.open(fpath.c_str(), "w");
-	if (!f) {
+	if (not f) {
 		HAL.println("Open error.");
 		SPIFFS.end();
 		return false;
@@ -821,19 +842,19 @@ bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
 }
 
 bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
-	if (!SPIFFS.begin(true)) {
+	if (not SPIFFS.begin(true)) {
 		HAL.println("Failed to begin SPIFFS.");
 		return false;
 	}
 
-	if (!SPIFFS.exists(fpath.c_str())) {
+	if (not SPIFFS.exists(fpath.c_str())) {
 		HAL.println("File not exists.");
 		SPIFFS.end();
 		return false;
 	}
 
 	File f = SPIFFS.open(fpath.c_str(), "r");
-	if (!f) {
+	if (not f) {
 		HAL.println("Open error.");
 		SPIFFS.end();
 		return false;
@@ -1026,6 +1047,15 @@ std::vector<uint8_t> HAL_GPIO_API::getPins() {
 
 String HAL_GPIO_API::getModifier() {
 	return "P";
+}
+
+void HAL_GPIO_API::setUnused(uint8_t pin) {
+	if (pin < 34) {
+		::pinMode(pin, INPUT_PULLUP);
+	} else {
+		// GPIO 34 以上は入力専用のため内部プルアップはできない
+		::pinMode(pin, INPUT);
+	}
 }
 
 bool HAL_GPIO_API::initializePulseCounter(uint8_t pin, PULSE_EDGE edge) {

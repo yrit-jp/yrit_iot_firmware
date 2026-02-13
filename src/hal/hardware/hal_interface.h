@@ -241,6 +241,22 @@ public:
 	}
 
 	// ==============================================================
+	//! @brief 空きヒープサイズ（バイト）を取得します
+	//! @return 空きヒープサイズ、不明な場合は 0 を返す
+	// =============================================================
+	virtual uint32_t getFreeHeapSize() {
+		return 0;
+	}
+
+	// ==============================================================
+	//! @brief 稼働開始以降の最小空きヒープサイズ（バイト）を取得します
+	//! @return 最小空きヒープサイズ、不明な場合は 0 を返す
+	// =============================================================
+	virtual uint32_t getMinimumFreeHeapSize() {
+		return 0;
+	}
+
+	// ==============================================================
 	//! @brief 乱数を取得します
 	//! @param[in] (minimum) 乱数の下限値
 	//! @param[in] (maximum) 乱数の上限値
@@ -1343,7 +1359,7 @@ public:
 	//! @return 適切に結合されたパス
 	// =============================================================
 	virtual String joinPath(String p1, String p2) {
-		if (!p1.endsWith("/") && !p2.startsWith("/")) {
+		if (not(p1.endsWith("/") or p2.startsWith("/"))) {
 			p1.concat("/");
 		}
 		p1.concat(p2);
@@ -1450,7 +1466,7 @@ public:
 	// =============================================================
 	virtual void setSaveDirectory(const char *path) {
 		_dpath = String(path);
-		if (!_dpath.startsWith("/")) {
+		if (not _dpath.startsWith("/")) {
 			_dpath = "/" + _dpath;
 		}
 		_current_linage = 0;
@@ -1464,7 +1480,7 @@ public:
 	virtual void setFileBaseName(const char *fname, const char *file_extension) {
 		_fname = String(fname);
 		_fext  = String(file_extension);
-		if (!_fext.startsWith(".")) {
+		if (not _fext.startsWith(".")) {
 			_fext = "." + _fext;
 		}
 		_current_linage = 0;
@@ -1482,7 +1498,7 @@ public:
 	//! @brief ロギングを開始する
 	// =============================================================
 	virtual void loggingStart() {
-		if (!_inited) {
+		if (not _inited) {
 			_logging = false;
 		} else {
 			_logging = true;
@@ -1578,6 +1594,14 @@ public:
 	// =============================================================
 	virtual String getModifier() {
 		return "";
+	}
+
+	// ==============================================================
+	//! @brief GPIO の未使用ピンのモードをセットします
+	//! @param[in] (pin) ピン番号
+	// =============================================================
+	virtual void setUnused(uint8_t pin) {
+		::pinMode(pin, INPUT_PULLUP);
 	}
 
 	// ==============================================================
@@ -1966,7 +1990,7 @@ public:
 	//! @note 変換結果は scaledImage に格納される
 	// =============================================================
 	virtual bool resizeCapturedImage(uint32_t maxWidth, uint32_t maxHeight) {
-		if (_capturedWidth == 0 || _capturedHeight == 0) {
+		if (_capturedWidth == 0 or _capturedHeight == 0) {
 			return false;
 		}
 

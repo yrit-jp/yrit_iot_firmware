@@ -36,10 +36,7 @@ void IoTTx::configUnixTimeField(bool enable, bool nano_precision) {
 void IoTTx::printPendingData() {
 	struct TX_INDEX tmp_index = _tx_idx;
 
-	while (_mutex) {
-		HAL.delay(1);
-	}
-	_mutex = true;
+	HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 	char s_day[64] = {'\0'};
 	bool flag      = false;
@@ -59,14 +56,14 @@ void IoTTx::printPendingData() {
 		HAL.println(":::::::::::::::::::::::::");
 	}
 
-	_mutex = false;
+	HAL.giveSemaphoreMutex(_mutex_key);
 }
 
-void IoTTx::printIndex(const char *str_begin, const char *str_end) {
-	HAL.printf("%s [store, send] = [%d, %d] %s", str_begin, _tx_idx.store, _tx_idx.transmit, str_end);
+void IoTTx::printIndex() {
+	HAL.printf("%s [store, send] = [%d, %d]\n", _DEBUG_PREFIX, _tx_idx.store, _tx_idx.transmit);
 }
 
-void IoTTx::printIndexEx(const char *str_begin, const char *str_end) {
+void IoTTx::printIndexEx() {
 	uint8_t ex_pendings = 0;
 	for (int i = 0; i < _EXCEPTIONAL_STORAGE_NUM; i++) {
 		if (_ex_buffer_info[i].updated == false) {
@@ -74,31 +71,40 @@ void IoTTx::printIndexEx(const char *str_begin, const char *str_end) {
 		}
 		ex_pendings++;
 	}
-	HAL.printf("%s [ex_store] = [%d] %s", str_begin, ex_pendings, str_end);
+	HAL.printf("%s [ex_store] = [%d]\n", _DEBUG_PREFIX, ex_pendings);
 }
 
-void IoTTx::debugMessage(const char *category, const char *prefix, const char *msg, const char *end) {
-	HAL.printf("[%s](%s) %s%s", category, prefix, msg, end);
-}
+// void IoTTx::debugMessage(const char *category, const char *prefix, const char *msg, const char *end) {
+void IoTTx::debugMessage(LogCategory log_category, LogLevel log_level, const char *msg, const char *end) {
+	constexpr const char *categories[] = {
+	    "Ambient",    // AMBIENT
+	    "Ambient Ex", // AMBIENT_EX
+	    "Ambient HB", // AMBIENT_HB
+	    "FTP",        // FTP
+	    "FTP Ex",     // FTP_EX
+	    "FTP HB",     // FTP_HB
+	    "HTTP",       // HTTP
+	    "HTTP Ex",    // HTTP_EX
+	    "HTTP HB",    // HTTP_HB
+	    "MQTT",       // MQTT
+	    "MQTT Ex",    // MQTT_EX
+	    "MQTT HB"     // MQTT_HB
+	};
+	const char *category = categories[static_cast<int>(log_category)];
 
-void IoTTx::loop_forever() {
-	while (1) {
-		update();
-		if (getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) {
-			// No data to transmit
-			delay(1000);
-		}
+	constexpr const char *levels[] = {
+	    "Error",   // Error
+	    "Warning", // Warning
+	    "Info",    // Info
+	    "Debug"    // Debug
+	};
+	const char *level = levels[static_cast<int>(log_level)];
 
-		updateEx();
-		if (getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) {
-			// No data to transmit
-			delay(1000);
-		}
-	}
+	HAL.printf("[%s](%s) %s%s", category, level, msg, end);
 }
 
 IoTTx_Tx_Result IoTTx::update() {
-	if (!txPending()) {
+	if (not txPending()) {
 		_last_result = RESULT_TX_NOTHING;
 	} else {
 		_last_result = transmit();
@@ -107,7 +113,7 @@ IoTTx_Tx_Result IoTTx::update() {
 }
 
 IoTTx_Tx_Result IoTTx::updateEx() {
-	if (!txPendingEx()) {
+	if (not txPendingEx()) {
 		_last_result_ex = RESULT_TX_NOTHING;
 	} else {
 		_last_result_ex = transmitEx();
@@ -191,7 +197,7 @@ String IoTTx::lld2String(signed long long val, int base) {
 		return "0";
 	}
 
-	for (; val && i; --i, val /= base) {
+	for (; val and i; --i, val /= base) {
 		buf[i] = "0123456789abcdef"[val % base];
 	}
 
@@ -200,6 +206,24 @@ String IoTTx::lld2String(signed long long val, int base) {
 	}
 
 	return String(&buf[i + 1]);
+}
+
+signed long long IoTTx::convertToUnixTime(const struct tm &struct_time, bool nano_sec) {
+	signed long long ts = mktime(const_cast<struct tm *>(&struct_time));
+	if (ts == -1) {
+		return -1;
+	}
+
+	String s = lld2String(ts);
+	String p = nano_sec ? "000000000" : "";
+
+	errno = 0;
+	ts    = strtoll((s + p).c_str(), NULL, 10);
+	if (errno == ERANGE) {
+		return -1;
+	}
+
+	return ts;
 }
 
 IoTTx_Tx_Result IoTTx::transmit() {

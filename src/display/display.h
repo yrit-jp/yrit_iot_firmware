@@ -16,6 +16,25 @@ struct SystemMessageRenderParam {
 	uint16_t LEFT_OFFSET;
 };
 
+enum class CursorPosition : uint8_t {
+	SINGLE_LINE, // 1行表示用（下寄せ）
+	DUAL_LINE,   // 2行表示用（上寄せ）
+};
+
+class VaListGuard {
+public:
+	VaListGuard(va_list &ap) : _ap(ap) {}
+	~VaListGuard() { va_end(_ap); }
+
+	// コピーコンストラクタと代入演算子を削除
+	VaListGuard(const VaListGuard &)            = delete;
+	VaListGuard &operator=(const VaListGuard &) = delete;
+
+private:
+	va_list &_ap;
+};
+
+void initMsgBox(CursorPosition position = CursorPosition::SINGLE_LINE);
 void updateDisplay(enum DisplayTiming dt, ...);
 enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &render,
                                             enum DisplayTiming dt,

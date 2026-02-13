@@ -30,6 +30,10 @@
  #endif
 
 #endif
+
+#include "utility/led/LED_Strip_Class.hpp"
+#include "utility/led/LED_PowerHub_Class.hpp"
+
 #endif
 
 /// [[fallthrough]];
@@ -63,9 +67,11 @@ int8_t M5Unified::_get_pin_table[pin_name_max];
     std::fill(_get_pin_table, _get_pin_table + pin_name_max, 255);
   }
 #else
+// Pin number table. Place unknown at the end of the table. 
+// If there is no corresponding value, the value of unknown is used.
 // ピン番号テーブル。 unknownをテーブルの最後に配置する。該当が無い場合はunknownの値が使用される。
 static constexpr const uint8_t _pin_table_i2c_ex_in[][5] = {
-                            // In CL,DA, EX CL,DA
+                            // In SCL,SDA, EX SCL,SDA
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
 { board_t::board_M5StackCoreS3, GPIO_NUM_11,GPIO_NUM_12 , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5StackCoreS3SE,GPIO_NUM_11,GPIO_NUM_12, GPIO_NUM_1 ,GPIO_NUM_2  },
@@ -75,17 +81,25 @@ static constexpr const uint8_t _pin_table_i2c_ex_in[][5] = {
 { board_t::board_M5DinMeter   , GPIO_NUM_12,GPIO_NUM_11 , GPIO_NUM_15,GPIO_NUM_13 },
 { board_t::board_M5AirQ       , GPIO_NUM_12,GPIO_NUM_11 , GPIO_NUM_15,GPIO_NUM_13 },
 { board_t::board_M5Cardputer  , 255        ,255         , GPIO_NUM_1 ,GPIO_NUM_2  },
+{ board_t::board_M5CardputerADV,GPIO_NUM_9 ,GPIO_NUM_8  , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5VAMeter    , GPIO_NUM_6 ,GPIO_NUM_5  , GPIO_NUM_9 ,GPIO_NUM_8  },
 { board_t::board_M5AtomS3R    , GPIO_NUM_0 ,GPIO_NUM_45 , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5AtomS3RExt , GPIO_NUM_0 ,GPIO_NUM_45 , GPIO_NUM_1 ,GPIO_NUM_2  },
+{ board_t::board_M5AtomEchoS3R, GPIO_NUM_0 ,GPIO_NUM_45 , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5AtomS3RCam , GPIO_NUM_0 ,GPIO_NUM_45 , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5PaperS3    , GPIO_NUM_42,GPIO_NUM_41 , GPIO_NUM_1 ,GPIO_NUM_2  },
 { board_t::board_M5StampPLC   , GPIO_NUM_15,GPIO_NUM_13 , GPIO_NUM_1 ,GPIO_NUM_2  },
+{ board_t::board_M5PowerHub   , GPIO_NUM_48,GPIO_NUM_45 , GPIO_NUM_16,GPIO_NUM_15 },
 { board_t::board_unknown      , GPIO_NUM_39,GPIO_NUM_38 , GPIO_NUM_1 ,GPIO_NUM_2  }, // AtomS3,AtomS3Lite,AtomS3U
 #elif defined (CONFIG_IDF_TARGET_ESP32C3)
 { board_t::board_unknown      , 255        ,255         , GPIO_NUM_0 ,GPIO_NUM_1  },
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
+{ board_t::board_M5UnitC6L     ,GPIO_NUM_8 ,GPIO_NUM_10 , 255        ,255         },
+{ board_t::board_ArduinoNessoN1,GPIO_NUM_8 ,GPIO_NUM_10 , GPIO_NUM_8 ,GPIO_NUM_10 },
 { board_t::board_unknown      , 255        ,255         , GPIO_NUM_1 ,GPIO_NUM_2  }, // NanoC6
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+{ board_t::board_M5Tab5       , GPIO_NUM_32,GPIO_NUM_31, GPIO_NUM_54,GPIO_NUM_53 }, // Tab5
+{ board_t::board_unknown      , 255        ,255         , 255        ,255        },
 #else
 { board_t::board_M5Stack      , GPIO_NUM_22,GPIO_NUM_21 , GPIO_NUM_22,GPIO_NUM_21 },
 { board_t::board_M5Paper      , GPIO_NUM_22,GPIO_NUM_21 , GPIO_NUM_32,GPIO_NUM_25 },
@@ -100,14 +114,19 @@ static constexpr const uint8_t _pin_table_i2c_ex_in[][5] = {
 };
 
 static constexpr const uint8_t _pin_table_port_bc[][5] = {
-                          //pB p1,p2, pC p1,p2
+                          //pB p1,p2, pC p1,p2 (p1 close to 5V)
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
 { board_t::board_M5StackCoreS3, GPIO_NUM_8 ,GPIO_NUM_9 , GPIO_NUM_18,GPIO_NUM_17 },
 { board_t::board_M5StackCoreS3SE,GPIO_NUM_8,GPIO_NUM_9 , GPIO_NUM_18,GPIO_NUM_17 },
 { board_t::board_M5Dial       , GPIO_NUM_1 ,GPIO_NUM_2 , 255        ,255         },
 { board_t::board_M5DinMeter   , GPIO_NUM_1 ,GPIO_NUM_2 , 255        ,255         },
+{ board_t::board_M5PowerHub   , 255        ,       255 , GPIO_NUM_1 ,GPIO_NUM_2  },
 #elif defined (CONFIG_IDF_TARGET_ESP32C3)
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
+{ board_t::board_M5UnitC6L     ,GPIO_NUM_4 ,GPIO_NUM_5 , GPIO_NUM_4 ,GPIO_NUM_5  },
+{ board_t::board_ArduinoNessoN1,GPIO_NUM_4 ,GPIO_NUM_5 , GPIO_NUM_4 ,GPIO_NUM_5  },
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+{ board_t::board_M5Tab5       , GPIO_NUM_17,GPIO_NUM_52, GPIO_NUM_7 ,GPIO_NUM_6  }, // Tab5
 #else
 { board_t::board_M5Stack      , GPIO_NUM_36,GPIO_NUM_26 , GPIO_NUM_16,GPIO_NUM_17 },
 { board_t::board_M5StackCore2 , GPIO_NUM_36,GPIO_NUM_26 , GPIO_NUM_13,GPIO_NUM_14 },
@@ -139,10 +158,13 @@ static constexpr const uint8_t _pin_table_spi_sd[][5] = {
 { board_t::board_M5StackCoreS3SE,GPIO_NUM_36,GPIO_NUM_37, GPIO_NUM_35, GPIO_NUM_4  },
 { board_t::board_M5Capsule    , GPIO_NUM_14, GPIO_NUM_12, GPIO_NUM_39, GPIO_NUM_11 },
 { board_t::board_M5Cardputer  , GPIO_NUM_40, GPIO_NUM_14, GPIO_NUM_39, GPIO_NUM_12 },
+{ board_t::board_M5CardputerADV,GPIO_NUM_40, GPIO_NUM_14, GPIO_NUM_39, GPIO_NUM_12 },
 { board_t::board_M5PaperS3    , GPIO_NUM_39, GPIO_NUM_38, GPIO_NUM_40, GPIO_NUM_47 },
 { board_t::board_M5StampPLC   , GPIO_NUM_7,  GPIO_NUM_8,  GPIO_NUM_9,  GPIO_NUM_10 },
 #elif defined (CONFIG_IDF_TARGET_ESP32C3)
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+{ board_t::board_M5Tab5       , GPIO_NUM_43,GPIO_NUM_44, GPIO_NUM_39, GPIO_NUM_42 },
 #else
 { board_t::board_M5Stack      , GPIO_NUM_18, GPIO_NUM_23, GPIO_NUM_19, GPIO_NUM_4  },
 { board_t::board_M5StackCore2 , GPIO_NUM_18, GPIO_NUM_23, GPIO_NUM_38, GPIO_NUM_4  },
@@ -157,13 +179,19 @@ static constexpr const uint8_t _pin_table_other0[][2] = {
 { board_t::board_M5AtomS3U    , GPIO_NUM_35 },
 { board_t::board_M5AtomS3Lite , GPIO_NUM_35 },
 { board_t::board_M5StampS3    , GPIO_NUM_21 },
+{ board_t::board_M5StampPLC   , GPIO_NUM_21 },
+{ board_t::board_M5AirQ       , GPIO_NUM_21 },
+{ board_t::board_M5Dial       , GPIO_NUM_21 },
+{ board_t::board_M5DinMeter   , GPIO_NUM_21 },
 { board_t::board_M5Capsule    , GPIO_NUM_21 },
 { board_t::board_M5Cardputer  , GPIO_NUM_21 },
+{ board_t::board_M5CardputerADV,GPIO_NUM_21 },
 #elif defined (CONFIG_IDF_TARGET_ESP32C3)
 { board_t::board_M5StampC3    , GPIO_NUM_2  },
 { board_t::board_M5StampC3U   , GPIO_NUM_2  },
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
 { board_t::board_M5NanoC6     , GPIO_NUM_20 },
+{ board_t::board_M5UnitC6L    , GPIO_NUM_2  },
 #else
 { board_t::board_M5Stack      , GPIO_NUM_15 },
 { board_t::board_M5StackCore2 , GPIO_NUM_25 },
@@ -200,6 +228,101 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
 { board_t::board_unknown      , 255         },
 };
 
+static constexpr const uint8_t _pin_table_mbus[][31] = {
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+{ board_t::board_M5Tab5   ,
+  255        , GPIO_NUM_16,
+  255        , GPIO_NUM_17,
+  255        , 255        ,
+  GPIO_NUM_18, GPIO_NUM_45,
+  GPIO_NUM_19, GPIO_NUM_52,
+  GPIO_NUM_5 , 255        ,
+  GPIO_NUM_38, GPIO_NUM_37,
+  GPIO_NUM_7 , GPIO_NUM_6 ,
+  GPIO_NUM_31, GPIO_NUM_32,
+  GPIO_NUM_3 , GPIO_NUM_4 ,
+  GPIO_NUM_2 , GPIO_NUM_48,
+  GPIO_NUM_47, GPIO_NUM_35,
+  255        , GPIO_NUM_51,
+  255        , 255        ,
+  255        , 255        ,
+},
+#elif defined (CONFIG_IDF_TARGET_ESP32S3)
+{ board_t::board_M5StackCoreS3,
+  255        , GPIO_NUM_10,
+  255        , GPIO_NUM_8 ,
+  255        , 255        ,
+  GPIO_NUM_37, GPIO_NUM_5 ,
+  GPIO_NUM_35, GPIO_NUM_9 ,
+  GPIO_NUM_36, 255        ,
+  GPIO_NUM_44, GPIO_NUM_43,
+  GPIO_NUM_18, GPIO_NUM_17,
+  GPIO_NUM_12, GPIO_NUM_11,
+  GPIO_NUM_2 , GPIO_NUM_1 ,
+  GPIO_NUM_6 , GPIO_NUM_7 ,
+  GPIO_NUM_13, GPIO_NUM_0 ,
+  255        , GPIO_NUM_14,
+  255        , 255        ,
+  255        , 255        ,
+},
+{ board_t::board_M5StackCoreS3SE,
+  255        , GPIO_NUM_10,
+  255        , GPIO_NUM_8 ,
+  255        , 255        ,
+  GPIO_NUM_37, GPIO_NUM_5 ,
+  GPIO_NUM_35, GPIO_NUM_9 ,
+  GPIO_NUM_36, 255        ,
+  GPIO_NUM_44, GPIO_NUM_43,
+  GPIO_NUM_18, GPIO_NUM_17,
+  GPIO_NUM_12, GPIO_NUM_11,
+  GPIO_NUM_2 , GPIO_NUM_1 ,
+  GPIO_NUM_6 , GPIO_NUM_7 ,
+  GPIO_NUM_13, GPIO_NUM_0 ,
+  255        , GPIO_NUM_14,
+  255        , 255        ,
+  255        , 255        ,
+},
+#elif defined (CONFIG_IDF_TARGET_ESP32C3)
+#elif defined (CONFIG_IDF_TARGET_ESP32C6)
+#else
+{ board_t::board_M5Stack  ,
+  255        , GPIO_NUM_35,
+  255        , GPIO_NUM_36,
+  255        , 255        ,
+  GPIO_NUM_23, GPIO_NUM_25,
+  GPIO_NUM_19, GPIO_NUM_26,
+  GPIO_NUM_18, 255        ,
+  GPIO_NUM_3 , GPIO_NUM_1 ,
+  GPIO_NUM_16, GPIO_NUM_17,
+  GPIO_NUM_21, GPIO_NUM_22,
+  GPIO_NUM_2 , GPIO_NUM_5 ,
+  GPIO_NUM_12, GPIO_NUM_13,
+  GPIO_NUM_15, GPIO_NUM_0 ,
+  255        , GPIO_NUM_34,
+  255        , 255        ,
+  255        , 255        ,
+},
+{ board_t::board_M5StackCore2,
+  255        , GPIO_NUM_35,
+  255        , GPIO_NUM_36,
+  255        , 255        ,
+  GPIO_NUM_23, GPIO_NUM_25,
+  GPIO_NUM_38, GPIO_NUM_26,
+  GPIO_NUM_18, 255        ,
+  GPIO_NUM_3 , GPIO_NUM_1 ,
+  GPIO_NUM_13, GPIO_NUM_14,
+  GPIO_NUM_21, GPIO_NUM_22,
+  GPIO_NUM_32, GPIO_NUM_33,
+  GPIO_NUM_27, GPIO_NUM_19,
+  GPIO_NUM_2 , GPIO_NUM_0 ,
+  255        , GPIO_NUM_34,
+  255        , 255        ,
+  255        , 255        ,
+},
+#endif
+{ board_t::board_unknown  , 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255 },
+};
+
   void M5Unified::_setup_pinmap(board_t id)
   {
     constexpr const std::pair<const void*, size_t> tbl[] = {
@@ -209,6 +332,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       { _pin_table_spi_sd, sizeof(_pin_table_spi_sd[0]) },
       { _pin_table_other0, sizeof(_pin_table_other0[0]) },
       { _pin_table_other1, sizeof(_pin_table_other1[0]) },
+      { _pin_table_mbus, sizeof(_pin_table_mbus[0]) },
     };
 
     int8_t* dst = _get_pin_table;
@@ -221,24 +345,6 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     }
   }
 #endif
-
-  static PI4IOE5V6408_Class* _io_expander_a = nullptr;
-  PI4IOE5V6408_Class* __get_io_expander_a()
-  {
-    return _io_expander_a;
-  }
-
-  void _io_expander_a_init()
-  {
-    // Init
-    _io_expander_a = new PI4IOE5V6408_Class;
-    if (!_io_expander_a->begin()) {
-      delete _io_expander_a;
-      _io_expander_a = nullptr;
-    } else {
-      _io_expander_a->resetIrq();
-    }
-  }
 
   static void in_i2c_bulk_write(const uint8_t i2c_addr, const uint8_t* bulk_data, const uint32_t i2c_freq = 100000u, const uint8_t retry = 0)
   {
@@ -256,13 +362,15 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     }
   }
 
+  static constexpr uint8_t es7210_i2c_addr = 0x40;
   static constexpr uint8_t es8311_i2c_addr0 = 0x18;
   static constexpr uint8_t es8311_i2c_addr1 = 0x19;
-  static constexpr uint8_t pi4ioe_i2c_addr = 0x43;
+  static constexpr uint8_t es8388_i2c_addr = 0x10;
+  static constexpr uint8_t pi4io1_i2c_addr = 0x43;
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
   static constexpr uint8_t aw88298_i2c_addr = 0x36;
-  static constexpr uint8_t es7210_i2c_addr = 0x40;
   static constexpr uint8_t aw9523_i2c_addr = 0x58;
+  static constexpr uint8_t powerhub_i2c_addr = 0x50;
   static void aw88298_write_reg(uint8_t reg, uint16_t value)
   {
     value = __builtin_bswap16(value);
@@ -334,6 +442,65 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     return true;
   }
 
+  bool M5Unified::_speaker_enabled_cb_tab5(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+    auto self = (M5Unified*)args;
+    auto spk_cfg = self->Speaker.config();
+    if (spk_cfg.pin_data_out != GPIO_NUM_26) { return false; }
+
+    static constexpr const uint8_t enabled_bulk_data[] = {
+      2,    0, 0x80,  // RESET/  CSM POWER ON
+      2,    0, 0x00,
+      2,    0, 0x00,
+      2,    0, 0x0E,
+      2,    1, 0x00,
+      2,    2, 0x0A, //CHIP POWER: power up all
+      2,    3, 0xFF, //ADC POWER: power down all
+      2,    4, 0x3C, //DAC POWER: power up and LOUT1/ROUT1/LOUT2/ROUT2 enable
+      2,    5, 0x00, //ChipLowPower1
+      2,    6, 0x00, //ChipLowPower2
+      2,    7, 0x7C, //VSEL
+      2,    8, 0x00, //set I2S slave mode
+      // reg9-22 == adc
+      2,   23, 0x18, //I2S format (16bit)
+      2,   24, 0x00, //I2S MCLK ratio (128)
+      2,   25, 0x20, //DAC unmute
+      2,   26, 0x00, //LDACVOL 0x00~0xC0
+      2,   27, 0x00, //RDACVOL 0x00~0xC0
+      2,   28, 0x08, //enable digital click free power up and down
+      2,   29, 0x00,
+      2,   38, 0x00, //DAC CTRL16
+      2,   39, 0xB8, //LEFT Ch MIX
+      2,   42, 0xB8, //RIGHTCh MIX
+      2,   43, 0x08, //ADC and DAC separate
+      2,   45, 0x00, // 0x00=1.5k VREF analog output / 0x10=40kVREF analog output
+      2,   46, 0x21,
+      2,   47, 0x21,
+      2,   48, 0x21,
+      2,   49, 0x21,
+      0
+    };
+    static constexpr const uint8_t disabled_bulk_data[] = {
+      2,    8, 0x00, //set I2S slave mode
+      0
+    };
+    in_i2c_bulk_write(es8388_i2c_addr, enabled ? enabled_bulk_data : disabled_bulk_data);
+
+    if (enabled)
+    { // AMP on
+      M5.In_I2C.bitOn(pi4io1_i2c_addr, 0x05, 0b00000010, 400000);
+    }
+    else
+    { // AMP off
+      M5.In_I2C.bitOff(pi4io1_i2c_addr, 0x05, 0b00000010, 400000);
+    }
+#endif
+    return true;
+  }
+
   bool M5Unified::_speaker_enabled_cb_hat_spk(void* args, bool enabled)
   {
     (void)args;
@@ -387,7 +554,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     m5gfx::i2c::i2c_temporary_switcher_t backup_i2c_setting(1, GPIO_NUM_38, GPIO_NUM_39);
 #endif
     in_i2c_bulk_write(es8311_i2c_addr0, enabled ? enabled_bulk_data : disabled_bulk_data);
-    in_i2c_bulk_write(pi4ioe_i2c_addr, enabled ? enabled_pi4ioe_bulk_data : disabled_pi4ioe_bulk_data);
+    in_i2c_bulk_write(pi4io1_i2c_addr, enabled ? enabled_pi4ioe_bulk_data : disabled_pi4ioe_bulk_data);
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
     backup_i2c_setting.restore();
 #endif
@@ -464,6 +631,32 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     return true;
   }
 
+  bool M5Unified::_speaker_enabled_cb_cardputer_adv(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    static constexpr const uint8_t enabled_bulk_data[] = {
+      2, 0x00, 0x80,  // 0x00 RESET/  CSM POWER ON
+      2, 0x01, 0xB5,  // 0x01 CLOCK_MANAGER/ MCLK=BCLK
+      2, 0x02, 0x18,  // 0x02 CLOCK_MANAGER/ MULT_PRE=3
+      2, 0x0D, 0x01,  // 0x0D SYSTEM/ Power up analog circuitry
+      2, 0x12, 0x00,  // 0x12 SYSTEM/ power-up DAC - NOT default
+      2, 0x13, 0x10,  // 0x13 SYSTEM/ Enable output to HP drive - NOT default
+      2, 0x32, 0xBF,  // 0x32 DAC/ DAC volume (0xBF == ±0 dB )
+      2, 0x37, 0x08,  // 0x37 DAC/ Bypass DAC equalizer - NOT default
+      0
+    };
+    static constexpr const uint8_t disabled_bulk_data[] = {
+      0
+    };
+
+    in_i2c_bulk_write(es8311_i2c_addr0, enabled ? enabled_bulk_data : disabled_bulk_data);
+#endif
+    return true;
+  }
+
+
   bool M5Unified::_microphone_enabled_cb_atomic_echo(void* args, bool enabled)
   {
     (void)args;
@@ -493,6 +686,208 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     backup_i2c_setting.restore();
 #endif
 
+    return true;
+  }
+
+  bool M5Unified::_microphone_enabled_cb_atom_echos3r(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    static constexpr const uint8_t enabled_bulk_data[] = {
+      2, 0x00, 0x80,  // 0x00 RESET/  CSM POWER ON
+      2, 0x01, 0xBA,  // 0x01 CLOCK_MANAGER/ MCLK=BCLK
+      2, 0x02, 0x18,  // 0x02 CLOCK_MANAGER/ MULT_PRE=3
+      2, 0x0D, 0x01,  // 0x0D SYSTEM/ Power up analog circuitry
+      2, 0x0E, 0x02,  // 0x0E SYSTEM/ : Enable analog PGA, enable ADC modulator
+      2, 0x14, 0x10,  // ES8311_ADC_REG14 : select Mic1p-Mic1n / PGA GAIN (minimum)
+      2, 0x17, 0xFF,  // ES8311_ADC_REG17 : ADC_VOLUME (MAXGAIN) // (0xBF == ± 0 dB )
+      2, 0x1C, 0x6A,  // ES8311_ADC_REG1C : ADC Equalizer bypass, cancel DC offset in digital domain
+      0
+    };
+    static constexpr const uint8_t disabled_bulk_data[] = {
+      2, 0x0D, 0xFC,  // 0x0D SYSTEM/ Power down analog circuitry
+      2, 0x0E, 0x6A,  // 0x0E SYSTEM
+      2, 0x00, 0x00,  // 0x00 RESET/  CSM POWER DOWN
+      0
+    };
+    m5gfx::i2c::i2c_temporary_switcher_t backup_i2c_setting(1, GPIO_NUM_45, GPIO_NUM_0);
+    in_i2c_bulk_write(es8311_i2c_addr0, enabled ? enabled_bulk_data : disabled_bulk_data);
+    backup_i2c_setting.restore();
+#endif
+    return true;
+  }
+
+  bool M5Unified::_speaker_enabled_cb_atom_echos3r(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    static constexpr const uint8_t enabled_bulk_data[] = {
+      2, 0x00, 0x80,  // 0x00 RESET/  CSM POWER ON
+      2, 0x01, 0xB5,  // 0x01 CLOCK_MANAGER/ MCLK=BCLK
+      2, 0x02, 0x18,  // 0x02 CLOCK_MANAGER/ MULT_PRE=3
+      2, 0x0D, 0x01,  // 0x0D SYSTEM/ Power up analog circuitry
+      2, 0x12, 0x00,  // 0x12 SYSTEM/ power-up DAC - NOT default
+      2, 0x13, 0x10,  // 0x13 SYSTEM/ Enable output to HP drive - NOT default
+      2, 0x32, 0xFF,  // 0x32 DAC/ DAC volume (full volume)
+      2, 0x37, 0x08,  // 0x37 DAC/ Bypass DAC equalizer - NOT default
+      0
+    };
+    static constexpr const uint8_t disabled_bulk_data[] = {
+      0
+    };
+
+    m5gfx::i2c::i2c_temporary_switcher_t backup_i2c_setting(1, GPIO_NUM_45, GPIO_NUM_0);
+    in_i2c_bulk_write(es8311_i2c_addr0, enabled ? enabled_bulk_data : disabled_bulk_data);
+    gpio_num_t pin_en = GPIO_NUM_18;
+    if (enabled)
+    {
+      m5gfx::pinMode(pin_en, m5gfx::pin_mode_t::output);
+      m5gfx::gpio_hi(pin_en);
+    }
+    else
+    { m5gfx::gpio_lo(pin_en); }
+    backup_i2c_setting.restore();
+#endif
+    return true;
+  }
+
+#if defined (CONFIG_IDF_TARGET_ESP32) && SOC_TOUCH_SENSOR_SUPPORTED
+  static void _read_touch_pad(uint32_t* results, const touch_pad_t* channel, const size_t channel_count)
+  {
+#if defined ( TOUCH_SENSOR_DEFAULT_FILTER_CONFIG )
+    /* Handles of touch sensor */
+    touch_sensor_handle_t sens_handle = nullptr;
+    touch_channel_handle_t chan_handle[TOUCH_TOTAL_CHAN_NUM];
+
+    /* Step 1: Create a new touch sensor controller handle with default sample configuration */
+    touch_sensor_sample_config_t sample_cfg;
+    sample_cfg.charge_duration_ms = 5.0f;
+    sample_cfg.charge_volt_lim_h = TOUCH_VOLT_LIM_H_1V7;
+    sample_cfg.charge_volt_lim_l = TOUCH_VOLT_LIM_L_0V5;
+
+    touch_sensor_config_t sens_cfg;
+    sens_cfg.power_on_wait_us = 256;
+    sens_cfg.meas_interval_us = 320.0;
+    sens_cfg.intr_trig_mode = TOUCH_INTR_TRIG_ON_BELOW_THRESH;
+    sens_cfg.intr_trig_group = TOUCH_INTR_TRIG_GROUP_BOTH;
+    sens_cfg.sample_cfg_num = 1;
+    sens_cfg.sample_cfg = &sample_cfg;
+    touch_sensor_new_controller(&sens_cfg, &sens_handle);
+
+    touch_channel_config_t chan_cfg;
+    chan_cfg.abs_active_thresh[0] = 1024;
+    chan_cfg.charge_speed = TOUCH_CHARGE_SPEED_7;
+    chan_cfg.init_charge_volt = TOUCH_INIT_CHARGE_VOLT_DEFAULT;
+    chan_cfg.group = TOUCH_CHAN_TRIG_GROUP_BOTH;
+    for (int i = 0; i < channel_count; i++) {
+      touch_sensor_new_channel(sens_handle, channel[i], &chan_cfg, &chan_handle[i]);
+    }
+    touch_sensor_filter_config_t filter_cfg = TOUCH_SENSOR_DEFAULT_FILTER_CONFIG();
+    touch_sensor_config_filter(sens_handle, &filter_cfg);
+    touch_sensor_enable(sens_handle);
+    touch_sensor_trigger_oneshot_scanning(sens_handle, 64);
+    touch_sensor_disable(sens_handle);
+
+    for (int i = 0; i < channel_count; i++) {
+      touch_channel_read_data(chan_handle[i], TOUCH_CHAN_DATA_TYPE_SMOOTH, &results[i]);
+    }
+    for (int i = 0; i < channel_count; i++) {
+      touch_sensor_del_channel(chan_handle[i]);
+    }
+    touch_sensor_del_controller(sens_handle);
+#else
+    touch_pad_init();
+    for (size_t i = 0; i < channel_count; i++) {
+      touch_pad_config(channel[i], TOUCH_PAD_THRESHOLD_MAX);
+    }
+    for (size_t i = 0; i < channel_count; i++) {
+      uint16_t tmp;
+      touch_pad_read(channel[i], &tmp);
+      results[i] = tmp;
+    }
+    touch_pad_deinit();
+#endif
+  }
+#endif
+
+  bool M5Unified::_microphone_enabled_cb_tab5(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+    auto self = (M5Unified*)args;
+    auto cfg = self->Mic.config();
+    if (cfg.pin_data_in != GPIO_NUM_28) { return false; }
+
+    M5.In_I2C.writeRegister8(es7210_i2c_addr, 0x00, 0xFF, 400000);
+    if (enabled)
+    {
+      static constexpr uint8_t data[] =
+      {
+        2, 0x00, 0x41, // RESET_CTL
+        2, 0x01, 0x1f, // CLK_ON_OFF
+        2, 0x06, 0x00, // DIGITAL_PDN
+        2, 0x07, 0x20, // ADC_OSR
+        2, 0x08, 0x10, // MODE_CFG
+        2, 0x09, 0x30, // TCT0_CHPINI
+        2, 0x0A, 0x30, // TCT1_CHPINI
+        2, 0x20, 0x0a, // ADC34_HPF2
+        2, 0x21, 0x2a, // ADC34_HPF1
+        2, 0x22, 0x0a, // ADC12_HPF2
+        2, 0x23, 0x2a, // ADC12_HPF1
+        2, 0x02, 0xC1,
+        2, 0x04, 0x01,
+        2, 0x05, 0x00,
+        2, 0x11, 0x60,
+        2, 0x40, 0x42, // ANALOG_SYS
+        2, 0x41, 0x70, // MICBIAS12
+        2, 0x42, 0x70, // MICBIAS34
+        2, 0x43, 0x1B, // MIC1_GAIN
+        2, 0x44, 0x1B, // MIC2_GAIN
+        2, 0x45, 0x00, // MIC3_GAIN
+        2, 0x46, 0x00, // MIC4_GAIN
+        2, 0x47, 0x00, // MIC1_LP
+        2, 0x48, 0x00, // MIC2_LP
+        2, 0x49, 0x00, // MIC3_LP
+        2, 0x4A, 0x00, // MIC4_LP
+        2, 0x4B, 0x00, // MIC12_PDN
+        2, 0x4C, 0xFF, // MIC34_PDN
+        2, 0x01, 0x14, // CLK_ON_OFF
+        0,
+      };
+      in_i2c_bulk_write(es7210_i2c_addr, data);
+    }
+#endif
+    return true;
+  }
+
+  bool M5Unified::_microphone_enabled_cb_cardputer_adv(void* args, bool enabled)
+  {
+    (void)args;
+    (void)enabled;
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    static constexpr const uint8_t enabled_bulk_data[] = {
+      2, 0x00, 0x80,  // 0x00 RESET/  CSM POWER ON
+      2, 0x01, 0xBA,  // 0x01 CLOCK_MANAGER/ MCLK=BCLK
+      2, 0x02, 0x18,  // 0x02 CLOCK_MANAGER/ MULT_PRE=3
+      2, 0x0D, 0x01,  // 0x0D SYSTEM/ Power up analog circuitry
+      2, 0x0E, 0x02,  // 0x0E SYSTEM/ : Enable analog PGA, enable ADC modulator
+      2, 0x14, 0x10,  // ES8311_ADC_REG14 : select Mic1p-Mic1n / PGA GAIN (minimum)
+      2, 0x17, 0xBF,  // ES8311_ADC_REG17 : ADC_VOLUME 0xBF == ± 0 dB
+      2, 0x1C, 0x6A,  // ES8311_ADC_REG1C : ADC Equalizer bypass, cancel DC offset in digital domain
+      0
+    };
+    static constexpr const uint8_t disabled_bulk_data[] = {
+      2, 0x0D, 0xFC,  // 0x0D SYSTEM/ Power down analog circuitry
+      2, 0x0E, 0x6A,  // 0x0E SYSTEM
+      2, 0x00, 0x00,  // 0x00 RESET/  CSM POWER DOWN
+      0
+    };
+
+    in_i2c_bulk_write(es8311_i2c_addr0, enabled ? enabled_bulk_data : disabled_bulk_data);
+#endif
     return true;
   }
 
@@ -531,17 +926,16 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
   G27に対してタッチセンサを使用すると、得られる値は Lite/ECHOの方が大きく、Matrixの方が小さい。
   なおタッチセンサの値には個体差があるため、判定の基準として絶対値ではなく G13(NC)のタッチセンサ値を比較に用いる。
 */
-              uint16_t g13, g27;
-              touch_pad_init();
-              touch_pad_config(TOUCH_PAD_NUM4, TOUCH_PAD_THRESHOLD_MAX);  // TOUCH_PAD_NUM4 == GPIO13
-              touch_pad_config(TOUCH_PAD_NUM7, TOUCH_PAD_THRESHOLD_MAX);  // TOUCH_PAD_NUM7 == GPIO27
-              touch_pad_read(TOUCH_PAD_NUM4, &g13);
-              touch_pad_read(TOUCH_PAD_NUM7, &g27);
-              touch_pad_deinit();
-              int diff = (g27 * 3 - g13);
-              // M5_LOGV("G13 = %d / G27 = %d / diff = %d", g13, g27, diff);
+              uint32_t results[2] = { 0, 0 };
+              static constexpr touch_pad_t s_channel_id[] = {
+                  TOUCH_PAD_NUM4, //Touch pad channel 4 is GPIO13(ESP32)
+                  TOUCH_PAD_NUM7, //Touch pad channel 7 is GPIO27(ESP32)
+              };
+              _read_touch_pad(results, s_channel_id, 2);
 
-              // Branches other than AtomMatrix
+              int diff = (results[1] * 3 - results[0]);
+              // M5_LOGV("G13 = %d / G27 = %d / diff = %d", results[0], results[1], diff);
+   // true==(Lite/ECHO) / false==AtomMatrix
               if (diff >= 0)
 #else
 /*
@@ -718,9 +1112,120 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
           backup.restore();
         }
       }
+
+      if (board == board_t::board_unknown) {
+        /// PowerHub ?
+
+        m5gfx::gpio::pin_backup_t pin_backup[] = { GPIO_NUM_48, GPIO_NUM_45 };
+        {
+          m5gfx::gpio::command((const uint8_t[]) {
+            m5gfx::gpio::command_write_low, GPIO_NUM_48,
+            m5gfx::gpio::command_mode_output, GPIO_NUM_48,  // SCL
+            m5gfx::gpio::command_write_low, GPIO_NUM_45,
+            m5gfx::gpio::command_mode_output, GPIO_NUM_45, // SDA
+          });
+
+          delay(50); // 延时 50ms，保证设备上电稳定
+
+          uint32_t result = 0;
+          for (uint8_t i2caddr: (const uint8_t[]){ 0x50 << 1}) { // PowerHub I2C 7bit addr = 0x50
+            delay(2); // 小延时
+            bool nack = true;
+            // I2C START
+            m5gfx::gpio_lo(GPIO_NUM_45);  // SDA LOW = START
+            for (int cycle = 0; cycle < 20; ++cycle) {
+              // SCL toggle
+              m5gfx::gpio_hi(GPIO_NUM_48);
+              delay(1);
+              m5gfx::gpio_lo(GPIO_NUM_48);
+              delay(1);
+
+              if (cycle & 1) {
+                if (cycle == 17) {
+                  nack = m5gfx::gpio_in(GPIO_NUM_45);  // 读 ACK
+                }
+              } else { 
+                if (i2caddr & 0x80) { // 输出 addr
+                  m5gfx::gpio_hi(GPIO_NUM_45); 
+                } else {
+                  m5gfx::gpio_lo(GPIO_NUM_45);
+                }
+                i2caddr <<= 1;
+                if (cycle >= 16) {
+                  m5gfx::pinMode(GPIO_NUM_45, (cycle == 16) ? m5gfx::pin_mode_t::input : m5gfx::pin_mode_t::output);
+                }
+              }
+            }
+            m5gfx::gpio_hi(GPIO_NUM_45); // SDA HIGH = STOP
+            result = result << 1 | nack;
+          }
+          if (result == 1) {
+            board = board_t::board_M5PowerHub;
+            ESP_LOGD("M5Unified", "PowerHub detected");
+          }
+        }
+
+        for (auto &backup : pin_backup) {
+          backup.restore();
+        }
+      }
       break;
 
     case 1: // EFUSE_PKG_VERSION_ESP32S3PICO: // LGA56
+      if (board == board_t::board_unknown) {
+        m5gfx::gpio::pin_backup_t pin_backup[] = { GPIO_NUM_0, GPIO_NUM_45 };
+        {
+          m5gfx::gpio::command((const uint8_t[]) {
+              m5gfx::gpio::command_write_low, GPIO_NUM_0,
+              m5gfx::gpio::command_mode_output, GPIO_NUM_0,  // SCL
+              m5gfx::gpio::command_write_low, GPIO_NUM_45,
+              m5gfx::gpio::command_mode_output, GPIO_NUM_45, // SDA
+            });
+
+          delay(50); // 延时 50ms，保证设备上电稳定
+
+          uint32_t result = 0;
+          for (uint8_t i2caddr: (const uint8_t[]){ 0x18 << 1 }) {
+            delay(2); // 小延时
+            bool nack = true;
+            // I2C START
+            m5gfx::gpio_lo(GPIO_NUM_45);  // SDA LOW = START
+            for (int cycle = 0; cycle < 20; ++cycle) {
+              // SCL toggle
+              m5gfx::gpio_hi(GPIO_NUM_0);
+              delay(1);
+              m5gfx::gpio_lo(GPIO_NUM_0);
+              delay(1);
+
+              if (cycle & 1) {
+                if (cycle == 17) {
+                  nack = m5gfx::gpio_in(GPIO_NUM_45);  // 读 ACK
+                }
+              } else {
+                if (i2caddr & 0x80) {
+                  m5gfx::gpio_hi(GPIO_NUM_45);
+                } else {
+                  m5gfx::gpio_lo(GPIO_NUM_45);
+                }
+                i2caddr <<= 1;
+                if (cycle >= 16) {
+                  m5gfx::pinMode(GPIO_NUM_45, (cycle == 16) ? m5gfx::pin_mode_t::input : m5gfx::pin_mode_t::output);
+                }
+              }
+            }
+            m5gfx::gpio_hi(GPIO_NUM_45); // SDA HIGH = STOP
+            result = result << 1 | nack;
+          }
+          if (result == 1) {
+            board = board_t::board_M5AtomEchoS3R;
+          }
+        }
+
+        for (auto &backup : pin_backup) {
+          backup.restore();
+        }
+      }
+
       if (board == board_t::board_unknown)
       { /// AtomS3RCam or AtomS3RExt ?
       // Cam    = GC0308 = I2C 7bit addr = 0x21
@@ -814,8 +1319,14 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
 
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
     if (board == board_t::board_unknown)
-    { // NanoC6      {
+    { // NanoC6
       board = board_t::board_M5NanoC6;
+    }
+
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+    if (board == board_t::board_unknown)
+    {
+      board = board_t::board_M5Tab5;
     }
 
 #endif
@@ -843,7 +1354,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       in_port = ex_port;
     }
 #endif
-    if ((int)in_scl >= 0)
+    if ((uint_fast8_t)in_scl < GPIO_NUM_MAX)
     {
       In_I2C.begin(in_port, in_sda, in_scl);
     }
@@ -852,12 +1363,89 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       In_I2C.setPort(I2C_NUM_MAX, in_sda, in_scl);
     }
 
-    if ((int)ex_scl >= 0)
+    if ((uint_fast8_t)ex_scl < GPIO_NUM_MAX)
     {
-      Ex_I2C.setPort(ex_port, ex_sda, ex_scl);
+      if ((in_port != ex_port) || (in_sda == ex_sda && in_scl == ex_scl) || ((uint_fast8_t)in_scl >= GPIO_NUM_MAX)) {
+        Ex_I2C.setPort(ex_port, ex_sda, ex_scl);
+      }
+    }
+
+    switch (board) {
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+    case board_t::board_M5Tab5:
+      for (int i = 0; i < 2; ++i)
+      {
+        auto ioexp = new PI4IOE5V6408_Class(0x43 + i);
+        ioexp->begin();
+        _io_expander[i].reset(ioexp);
+      }
+      break;
+#elif defined (CONFIG_IDF_TARGET_ESP32C6)
+    case board_t::board_M5UnitC6L:
+      {
+        auto ioexp = new PI4IOE5V6408_Class(0x43);
+        ioexp->begin();
+        _io_expander[0].reset(ioexp);
+      }
+      break;
+    case board_t::board_ArduinoNessoN1:
+      for (int i = 0; i < 2; ++i)
+      {
+        auto ioexp = new PI4IOE5V6408_Class(0x43 + i);
+        ioexp->begin();
+        _io_expander[i].reset(ioexp);
+      }
+      break;
+#elif defined (CONFIG_IDF_TARGET_ESP32S3)
+    case board_t::board_M5StampPLC:
+      {
+        auto ioexp = new PI4IOE5V6408_Class;
+        ioexp->begin();
+        _io_expander[0].reset(ioexp);
+      }
+      break;
+#endif
+    default:
+      break;
     }
 #endif
+  }
+  void M5Unified::_setup_led(board_t board)
+  {
+#if !defined (M5UNIFIED_PC_BUILD)
+    int led_count = 1;
+    int byte_per_led = 3;
+    switch (board)
+    {
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case board_t::board_M5PowerHub:
+      Led.setLedInstance(std::make_shared<m5::LED_PowerHub_Class>());
+      return;
+#else
+    case board_t::board_M5AtomMatrix:
+      led_count = 25;
+      break;
+#endif
+    default:
+      break;
+    }
 
+    auto pin_rgb_led = M5.getPin(m5::pin_name_t::rgb_led);
+    if (pin_rgb_led >= 0)
+    {
+      auto busled = std::make_shared<m5::LedBus_RMT>();
+      auto buscfg = busled->getConfig();
+      buscfg.pin_data = pin_rgb_led;
+      busled->setConfig(buscfg);
+      auto led_strip = std::make_shared<m5::LED_Strip_Class>();
+      auto ledcfg = led_strip->getConfig();
+      ledcfg.led_count = led_count;
+      ledcfg.byte_per_led = byte_per_led;
+      led_strip->setBus(busled);
+      led_strip->setConfig(ledcfg);
+      Led.setLedInstance(led_strip);
+    }
+#endif
   }
 
   void M5Unified::_begin(const config_t& cfg)
@@ -873,7 +1461,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     if (pmic_type == Power_Class::pmic_t::pmic_axp2101
      || pmic_type == Power_Class::pmic_t::pmic_axp192)
     {
-      use_pmic_button = cfg.pmic_button;
+      _use_pmic_button = cfg.pmic_button;
       /// Slightly lengthen the acceptance time of the AXP192 power button multiclick.
       BtnPWR.setHoldThresh(BtnPWR.getHoldThresh() * 1.2);
     }
@@ -984,6 +1572,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     case board_t::board_M5AtomS3Lite:
     case board_t::board_M5AtomS3U:
     case board_t::board_M5AtomS3R:
+    case board_t::board_M5AtomEchoS3R:
       m5gfx::pinMode(GPIO_NUM_41, m5gfx::pin_mode_t::input);
       break;
 
@@ -999,6 +1588,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
 
     case board_t::board_M5StampS3:
     case board_t::board_M5Cardputer:
+    case board_t::board_M5CardputerADV:
       m5gfx::pinMode(GPIO_NUM_0, m5gfx::pin_mode_t::input);
       break;
 
@@ -1009,21 +1599,25 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       break;
 
     case board_t::board_M5StampPLC:
-      _io_expander_a_init();
-
-      // lcd backlight
-      _io_expander_a->setDirection(7, true);
-      _io_expander_a->setPullMode(7, false);
-      _io_expander_a->setHighImpedance(7, false);
-
-      for (int i = 0; i < 3; ++i) {
-        // button a~c
-        _io_expander_a->setDirection(i, false);
-        _io_expander_a->setPullMode(i, true);
-        _io_expander_a->setHighImpedance(i, false);
+      {
+        auto& ioexp = getIOExpander(0);
+        // lcd backlight
+        ioexp.setDirection(7, true);
+        ioexp.setPullMode(7, false);
+        ioexp.setHighImpedance(7, false);
+  
+        for (int i = 0; i < 3; ++i) {
+          // button a~c
+          ioexp.setDirection(i, false);
+          ioexp.setPullMode(i, true);
+          ioexp.setHighImpedance(i, false);
+        }
+        delay(100);
       }
+      break;
 
-      delay(100);
+    case board_t::board_M5PowerHub:
+      m5gfx::pinMode(GPIO_NUM_11, m5gfx::pin_mode_t::input);
       break;
 
 #endif
@@ -1058,6 +1652,22 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       switch (_board)
       {
 #if defined (M5UNIFIED_PC_BUILD)
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+      case board_t::board_M5Tab5:
+        if (cfg.internal_mic)
+        {
+          mic_cfg.pin_mck = GPIO_NUM_30;
+          mic_cfg.pin_bck = GPIO_NUM_27;
+          mic_cfg.pin_ws = GPIO_NUM_29;
+          mic_cfg.pin_data_in = GPIO_NUM_28;
+          // mic_cfg.pin_data_out = GPIO_NUM_26;
+          mic_cfg.magnification = 2;
+          mic_cfg.input_channel = input_channel_t::input_stereo;
+          mic_cfg.i2s_port = I2S_NUM_0;
+          mic_enable_cb = _microphone_enabled_cb_tab5;
+        }
+        break;
+
 #elif defined (CONFIG_IDF_TARGET_ESP32S3)
       case board_t::board_M5StackCoreS3:
       case board_t::board_M5StackCoreS3SE:
@@ -1088,6 +1698,16 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
         {
           mic_cfg.pin_data_in = GPIO_NUM_46;
           mic_cfg.pin_ws = GPIO_NUM_43;
+        }
+        break;
+
+      case board_t::board_M5CardputerADV:
+        if (cfg.internal_mic)
+        {
+          mic_cfg.pin_data_in = GPIO_NUM_46;
+          mic_cfg.pin_ws = GPIO_NUM_43;
+          mic_cfg.pin_bck = GPIO_NUM_41;
+          mic_enable_cb = _microphone_enabled_cb_cardputer_adv;
         }
         break;
 
@@ -1166,6 +1786,32 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       switch (_board)
       {
 #if defined (M5UNIFIED_PC_BUILD)
+#elif defined (CONFIG_IDF_TARGET_ESP32C6)
+      case board_t::board_M5UnitC6L:
+      case board_t::board_ArduinoNessoN1:
+        if (cfg.internal_spk)
+        {
+          spk_cfg.pin_data_out = GPIO_NUM_11;
+          spk_cfg.buzzer = true;
+          spk_cfg.magnification = 48;
+        }
+        break;
+
+#elif defined (CONFIG_IDF_TARGET_ESP32P4)
+      case board_t::board_M5Tab5:
+        if (cfg.internal_spk)
+        {
+          spk_cfg.pin_mck = GPIO_NUM_30;
+          spk_cfg.pin_bck = GPIO_NUM_27;
+          spk_cfg.pin_ws = GPIO_NUM_29;
+//        spk_cfg.pin_data_in = GPIO_NUM_28;
+          spk_cfg.pin_data_out = GPIO_NUM_26;
+          spk_cfg.magnification = 4;
+          spk_cfg.i2s_port = I2S_NUM_0;
+          spk_enable_cb = _speaker_enabled_cb_tab5;
+        }
+        break;
+
 #elif defined (CONFIG_IDF_TARGET_ESP32S3)
       case board_t::board_M5StackCoreS3:
       case board_t::board_M5StackCoreS3SE:
@@ -1237,6 +1883,30 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
         }
         break;
 
+      case board_t::board_M5AtomEchoS3R:
+        if (cfg.internal_mic) {
+          cfg.internal_imu = false;
+
+          // spk_cfg.pin_mck = GPIO_NUM_11;
+          spk_cfg.pin_bck = GPIO_NUM_17;
+          spk_cfg.pin_ws = GPIO_NUM_3;
+          spk_cfg.pin_data_out = GPIO_NUM_48;
+          spk_cfg.magnification = 1;
+          spk_cfg.i2s_port = I2S_NUM_1;
+          spk_enable_cb = _speaker_enabled_cb_atom_echos3r;
+
+          mic_cfg.i2s_port = spk_cfg.i2s_port;
+          mic_cfg.pin_mck = GPIO_NUM_11;
+          mic_cfg.pin_bck = GPIO_NUM_17;
+          mic_cfg.pin_ws = GPIO_NUM_3;
+          mic_cfg.pin_data_in = GPIO_NUM_4;
+          mic_cfg.magnification = 1;
+          mic_cfg.over_sampling = 1;
+          mic_cfg.stereo = true;
+          mic_enable_cb = _microphone_enabled_cb_atom_echos3r;
+        }
+      break;
+
       case board_t::board_M5Capsule:
         if (cfg.internal_spk)
         {
@@ -1284,6 +1954,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
         break;
 
       case board_t::board_M5Cardputer:
+      case board_t::board_M5CardputerADV:
         if (cfg.internal_spk)
         {
           spk_cfg.pin_bck = GPIO_NUM_41;
@@ -1291,6 +1962,9 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
           spk_cfg.pin_data_out = GPIO_NUM_42;
           spk_cfg.magnification = 16;
           spk_cfg.i2s_port = I2S_NUM_1;
+          if (_board == board_t::board_M5CardputerADV) {
+            spk_enable_cb = _speaker_enabled_cb_cardputer_adv;
+          }
         }
         break;
 
@@ -1341,7 +2015,6 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
         }
         else if (cfg.external_speaker.hat_spk)
         { /// for HAT SPK
-          use_hat_spk = true;
           gpio_num_t pin_en = _board == board_t::board_M5StackCoreInk ? GPIO_NUM_25 : GPIO_NUM_0;
           m5gfx::gpio_lo(pin_en);
           m5gfx::pinMode(pin_en, m5gfx::pin_mode_t::output);
@@ -1446,6 +2119,9 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       if (cfg.external_speaker_value)
       {
 #if defined (M5UNIFIED_PC_BUILD)
+#elif defined ( CONFIG_IDF_TARGET_ESP32P4 )
+ #define ENABLE_M5MODULE
+        if (_board == board_t::board_M5Tab5)
 #elif defined ( CONFIG_IDF_TARGET_ESP32S3 )
  #define ENABLE_M5MODULE
         if (_board == board_t::board_M5StackCoreS3
@@ -1465,34 +2141,16 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
             if (use_module_display) {
               spk_cfg.sample_rate = 48000; // Module Display audio output is fixed at 48 kHz
             }
-            uint32_t pins_index = use_module_display;
-  #if defined ( CONFIG_IDF_TARGET_ESP32S3 )
-            static constexpr const uint8_t pins[][2] =
-            {// DOUT       , BCK
-              { GPIO_NUM_13, GPIO_NUM_7 }, // CoreS3 + ModuleRCA
-              { GPIO_NUM_13, GPIO_NUM_6 }, // CoreS3 + ModuleDisplay
-            };
-  #else
-            static constexpr const uint8_t pins[][2] =
-            {// DOUT       , BCK
-              { GPIO_NUM_2 , GPIO_NUM_19 }, // Core2 and Tough + ModuleRCA
-              { GPIO_NUM_2 , GPIO_NUM_27 }, // Core2 and Tough + ModuleDisplay
-              { GPIO_NUM_15, GPIO_NUM_13 }, // Core + ModuleRCA
-              { GPIO_NUM_15, GPIO_NUM_12 }, // Core + ModuleDisplay
-            };
-            // !core is (Core2 + Tough)
-            if (_board == m5::board_t::board_M5Stack) {
-              pins_index += 2;            
-            }
-  #endif
-            spk_cfg.pin_data_out = pins[pins_index][0];
-            spk_cfg.pin_bck      = pins[pins_index][1];
+            // ModuleDisplay or Module RCA
+            spk_cfg.pin_bck      = getPin(use_module_display ? pin_name_t::mbus_pin21 : pin_name_t::mbus_pin22);
+            spk_cfg.pin_data_out = getPin(pin_name_t::mbus_pin23);
+            spk_cfg.pin_ws       = getPin(pin_name_t::mbus_pin24);     // LRCK
+
             spk_cfg.i2s_port = I2S_NUM_1;
             spk_cfg.magnification = 16;
             spk_cfg.stereo = true;
             spk_cfg.buzzer = false;
             spk_cfg.use_dac = false;
-            spk_cfg.pin_ws = GPIO_NUM_0;     // LRCK
             spk_enable_cb = nullptr;
           }
  #undef ENABLE_M5MODULE
@@ -1522,9 +2180,9 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
 
     if (cfg.internal_rtc && In_I2C.isEnabled())
     {
-      M5.Rtc.begin();
+      M5.Rtc.begin(&M5.In_I2C, M5.getBoard());
     }
-    if (!M5.Rtc.isEnabled() && cfg.external_rtc)
+    if (!M5.Rtc.isEnabled() && cfg.external_rtc && Ex_I2C.isEnabled())
     {
       port_a_used = M5.Rtc.begin(&M5.Ex_I2C);
     }
@@ -1540,7 +2198,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     {
       M5.Imu.begin(&M5.In_I2C, M5.getBoard());
     }
-    if (!M5.Imu.isEnabled() && cfg.external_imu)
+    if (!M5.Imu.isEnabled() && cfg.external_imu && Ex_I2C.isEnabled())
     {
       port_a_used = M5.Imu.begin(&M5.Ex_I2C) || port_a_used;
     }
@@ -1575,6 +2233,10 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       case board_t::board_M5PaperS3:
         tb_y = 960;
         tb_k = 364; // (65536*3/540)
+        break;
+      case board_t::board_M5Tab5:
+        tb_y = 1280;
+        tb_k = 273; // (65536*3/540)
         break;
       default:
         break;
@@ -1685,6 +2347,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
 
     case board_t::board_M5StampS3:
     case board_t::board_M5Cardputer:
+    case board_t::board_M5CardputerADV:
       use_rawstate_bits = 0b00001;
       btn_rawstate_bits = (!m5gfx::gpio_in(GPIO_NUM_0)) & 1;
       break;
@@ -1693,6 +2356,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     case board_t::board_M5AtomS3Lite:
     case board_t::board_M5AtomS3U:
     case board_t::board_M5AtomS3R:
+    case board_t::board_M5AtomEchoS3R:
       use_rawstate_bits = 0b00001;
       btn_rawstate_bits = (!m5gfx::gpio_in(GPIO_NUM_41)) & 1;
       break;
@@ -1700,14 +2364,15 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     case board_t::board_M5Capsule:
     case board_t::board_M5Dial:
     case board_t::board_M5DinMeter:
-      use_rawstate_bits = 0b00001;
-      btn_rawstate_bits = (!m5gfx::gpio_in(GPIO_NUM_42)) & 1;
+      use_rawstate_bits = 0b00011;
+      btn_rawstate_bits = ((!m5gfx::gpio_in(GPIO_NUM_42)) & 1)
+                        | ((!m5gfx::gpio_in(GPIO_NUM_0)) & 1) << 1;
       break;
 
     case board_t::board_M5StampPLC:
     {
       use_rawstate_bits = 0b00111;
-      auto value = _io_expander_a->readRegister8(0x0F);
+      auto value = _io_expander[0]->readRegister8(0x0F);
       btn_rawstate_bits = (!(value & 0b100) ? 0b00001 : 0) // BtnA
                         | (!(value & 0b010) ? 0b00010 : 0) // BtnB
                         | (!(value & 0b001) ? 0b00100 : 0) // BtnC
@@ -1715,6 +2380,16 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     }
       break;
 
+    case board_t::board_M5PowerHub:
+    {
+      use_rawstate_bits = 0b00011;
+      auto value = M5.In_I2C.readRegister8(powerhub_i2c_addr, 0xA0, 100000);
+      // ESP_LOGI("M5Unified", "M5PowerHub Btn read: %02X", value);
+      btn_rawstate_bits = (!m5gfx::gpio_in(GPIO_NUM_11) & 1) // BtnA
+                        | (!(value & 0b001) ? 0b00010 : 0) // BtnB
+                        ;
+      break;
+    }
     default:
 
     break;
@@ -1747,6 +2422,24 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
       btn_rawstate_bits = (!m5gfx::gpio_in(GPIO_NUM_9) ? 0b00001 : 0);
       break;
 
+    case board_t::board_M5UnitC6L:
+      {
+        use_rawstate_bits = 0b00001;
+        auto value = _io_expander[0]->readRegister8(0x0F);
+        btn_rawstate_bits = (!(value & 0b001) ? 0b00001 : 0); // BtnA
+      }
+      break;
+
+    case board_t::board_ArduinoNessoN1:
+      {
+        use_rawstate_bits = 0b00011;
+        auto value = _io_expander[0]->readRegister8(0x0F);
+        btn_rawstate_bits = (!(value & 0b001) ? 0b00001 : 0) // BtnA
+                          | (!(value & 0b010) ? 0b00010 : 0) // BtnB
+                          ;
+      }
+      break;
+
     default:
       break;
     }
@@ -1762,7 +2455,7 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     }
 
 #if defined (CONFIG_IDF_TARGET_ESP32) || defined (CONFIG_IDF_TARGET_ESP32S3)
-    if (use_pmic_button)
+    if (_use_pmic_button)
     {
       Button_Class::button_state_t state = Button_Class::button_state_t::state_nochange;
       bool read_axp = (ms - BtnPWR.getUpdateMsec()) >= BTNPWR_MIN_UPDATE_MSEC;
@@ -1794,6 +2487,9 @@ static constexpr const uint8_t _pin_table_other1[][2] = {
     case board_t::board_M5Paper:
     case board_t::board_M5PaperS3:
       height = 960;
+      break;
+    case board_t::board_M5Tab5:
+      height = 1280;
       break;
     default:
       break;

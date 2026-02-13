@@ -10,6 +10,9 @@ std::unique_ptr<IoTTxFTP> tx_ftp;
 std::unique_ptr<IoTTxHTTP> tx_http;
 std::unique_ptr<IoTTxMQTT> tx_mqtt;
 
+constexpr bool DEFAULT_FALSE = false;
+constexpr bool DEFAULT_TRUE  = true;
+
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 //
 //  Initialize Functions
@@ -48,7 +51,7 @@ void InitializeSettingParameter() {
 			while (HAL.BtnA_isPressed()) {
 				// Wait Release
 				HAL.update();
-				HAL.delay(1);
+				HAL.delay(5);
 			}
 		}
 
@@ -71,8 +74,8 @@ void InitializeSettingParameter() {
 		sbt->begin(chipid);
 
 		HAL.Log.loggingStop();
-		while (1) {
-			HAL.delay(1);
+		while (true) {
+			HAL.delay(5);
 			HAL.update();
 			updateDisplay(DisplayTiming::SS_LOOP);
 			if (sbt->update() == ZAS_COMPLETE) {
@@ -124,26 +127,25 @@ void InitializeGPIO() {
 
 	if (pins.size() == 0) {
 		updateDisplay(DisplayTiming::GPIO_INIT_DONE);
-		HAL.println("Pass (ignore)!");
+		HAL.println("Skip (ignore)!");
 		return;
 	}
 
 	for (int i = 0; i < pins.size(); i++) {
 		uint8_t pin = pins[i];
 		String key  = modifier + String(pin);
-		if (strcmp(param_manager.getParameter<const char *>(key.c_str(), "ENABLE"), "true") != 0) {
+		if (param_manager.getParameter(key.c_str(), "ENABLE", DEFAULT_FALSE) == false) {
 			// GPIO が無効の場合
-			HAL.Gpio.pinMode(pin, INPUT_PULLUP);
+			HAL.Gpio.setUnused(pin);
 			continue;
 		}
 
-		uint8_t shift_level = 4; // "4" don't have special mean
-		if (param_manager.checkParameter(key.c_str(), "SHIFT_LEVEL") == true) {
-			shift_level = param_manager.getParameter<uint8_t>(key.c_str(), "SHIFT_LEVEL");
-			shift_level = (shift_level > (HAL.Gpio.getAdcBits() - 1))
-			                  ? HAL.Gpio.getAdcBits()
-			                  : shift_level; // 12bit ADC
-		}
+		constexpr uint8_t DEFAULT_LEVEL = 4; // "4" don't have special mean
+
+		uint8_t shift_level = param_manager.getParameter<uint8_t>(key.c_str(), "SHIFT_LEVEL", DEFAULT_LEVEL);
+		shift_level         = (shift_level > (HAL.Gpio.getAdcBits() - 1))
+		                          ? HAL.Gpio.getAdcBits()
+		                          : shift_level; // 12bit ADC
 
 		Sensor gpio_sensor;
 		gpio_sensor.type           = TYPE_GPIO;
@@ -158,32 +160,18 @@ void InitializeGPIO() {
 		gpio_sensor.i_value.prev   = -1;  // Digital and analog values are absolutely positive.
 		gpio_sensor.d_value.latest = 0.0; // Not used in GPIO
 		gpio_sensor.d_value.prev   = 0.0; // Not used in GPIO
-		gpio_sensor.tx_on_change   = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "TX_ON_CHANGE"), "true") == 0);
+		gpio_sensor.tx_on_change   = param_manager.getParameter(key.c_str(), "TX_ON_CHANGE", DEFAULT_FALSE);
 		gpio_sensor.shift_level    = shift_level;
 		gpio_sensor.port           = pin;
 
 		gpio_sensor.GPIO.pin            = pin;
-		gpio_sensor.GPIO.digital        = true;
-		gpio_sensor.GPIO.tx_link_i2c    = false;
-		gpio_sensor.GPIO.tx_link_modbus = false;
-		if (param_manager.checkParameter(key.c_str(), "DIGITAL") == true) {
-			gpio_sensor.GPIO.digital = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "DIGITAL"), "true") == 0);
-		}
-		if (param_manager.checkParameter(key.c_str(), "TX_LINK_I2C") == true) {
-			gpio_sensor.GPIO.tx_link_i2c = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "TX_LINK_I2C"), "true") == 0);
-		}
-		if (param_manager.checkParameter(key.c_str(), "TX_LINK_MODBUS") == true) {
-			gpio_sensor.GPIO.tx_link_modbus = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "TX_LINK_MODBUS"), "true") == 0);
-		}
+		gpio_sensor.GPIO.digital        = param_manager.getParameter(key.c_str(), "DIGITAL", DEFAULT_TRUE);
+		gpio_sensor.GPIO.tx_link_i2c    = param_manager.getParameter(key.c_str(), "TX_LINK_I2C", DEFAULT_FALSE);
+		gpio_sensor.GPIO.tx_link_modbus = param_manager.getParameter(key.c_str(), "TX_LINK_MODBUS", DEFAULT_FALSE);
 
 		if (gpio_sensor.GPIO.digital) {
-			if (param_manager.checkParameter(key.c_str(), "PULL_UP") == true) {
-				// PULL_UP パラメータが存在する場合
-				bool pull_up = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "PULL_UP"), "true") == 0);
-				HAL.Gpio.pinMode(pin, pull_up ? INPUT_PULLUP : INPUT);
-			} else {
-				HAL.Gpio.pinMode(pin, INPUT);
-			}
+			bool pull_up = param_manager.getParameter(key.c_str(), "PULL_UP", DEFAULT_FALSE);
+			HAL.Gpio.pinMode(pin, pull_up ? INPUT_PULLUP : INPUT);
 		} else {
 			HAL.Gpio.pinMode(pin, INPUT);
 		}
@@ -206,7 +194,7 @@ void InitializePulseCounter() {
 
 	if (pins.size() == 0) {
 		updateDisplay(DisplayTiming::PULSE_COUNTER_INIT_END);
-		HAL.println("Pass (ignore)!");
+		HAL.println("Skip (ignore)!");
 		return;
 	}
 
@@ -217,37 +205,28 @@ void InitializePulseCounter() {
 		HAL.printf("    Pin %d... ", pin);
 		updateDisplay(DisplayTiming::PULSE_COUNTER_INIT_TARGET, pin);
 
-		if (strcmp(param_manager.getParameter<const char *>(key.c_str(), "ENABLE"), "true") != 0) {
+		if (param_manager.getParameter(key.c_str(), "ENABLE", DEFAULT_FALSE) == false) {
 			// GPIO が無効の場合
-			HAL.println("Pass (ignore)! -> Disabled");
+			HAL.println("Skip (ignore)! -> Disabled");
 			continue;
 		}
 
-		if (param_manager.checkParameter(key.c_str(), "DIGITAL") == true) {
-			if ((strcmp(param_manager.getParameter<const char *>(key.c_str(), "DIGITAL"), "true") != 0)) {
-				// アナログ入力モードの場合
-				HAL.println("Pass (ignore)! -> Analog mode");
-				continue;
-			}
-		}
-
-		if (param_manager.checkParameter(key.c_str(), "PULSE_COUNT_RISE") == false ||
-		    param_manager.checkParameter(key.c_str(), "PULSE_COUNT_FALL") == false) {
-			// パルスカウント用の設定パラメータが存在しない場合
-			HAL.println("Pass (ignore)! -> No parameters");
+		if (param_manager.getParameter(key.c_str(), "DIGITAL", DEFAULT_TRUE) == false) {
+			// アナログ入力モードの場合
+			HAL.println("Skip (ignore)! -> Analog mode");
 			continue;
 		}
 
-		bool edge_rising  = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "PULSE_COUNT_RISE"), "true") == 0);
-		bool edge_falling = (strcmp(param_manager.getParameter<const char *>(key.c_str(), "PULSE_COUNT_FALL"), "true") == 0);
-		if (edge_rising == false && edge_falling == false) {
-			// パルスカウント機能が無効になっている
-			HAL.println("Pass (ignore)! -> Disable pulse count");
+		bool edge_rising  = param_manager.getParameter(key.c_str(), "PULSE_COUNT_RISE", DEFAULT_FALSE);
+		bool edge_falling = param_manager.getParameter(key.c_str(), "PULSE_COUNT_FALL", DEFAULT_FALSE);
+		if (edge_rising == false and edge_falling == false) {
+			// パルスカウント用の設定パラメータが存在しない または パルスカウント機能が無効になっている
+			HAL.println("Skip (ignore)! -> Disable pulse count");
 			continue;
 		}
 
 		// 検出エッジの決定
-		PULSE_EDGE edge = (edge_rising && edge_falling)
+		PULSE_EDGE edge = (edge_rising and edge_falling)
 		                      ? PULSE_EDGE::BOTH
 		                      : ((edge_rising)
 		                             ? PULSE_EDGE::RISE
@@ -255,11 +234,12 @@ void InitializePulseCounter() {
 
 		if (HAL.Gpio.initializePulseCounter(pin, edge) == false) {
 			// 初期化の失敗
-			HAL.println("Pass (ignore)!");
+			HAL.println("Skip (ignore)!");
 			continue;
 		}
 
 		Sensor pulse_count_sensor;
+		// 合計パルスのセット
 		pulse_count_sensor.type = TYPE_PULSE_TOTAL;
 		pulse_count_sensor.name = param_manager.getParameter<const char *>(key.c_str(), "NAME");
 		pulse_count_sensor.name += "_Pulse_Total";
@@ -284,6 +264,7 @@ void InitializePulseCounter() {
 
 		sensors.push_back(pulse_count_sensor);
 
+		// 差分パルスのセット
 		pulse_count_sensor.type = TYPE_PULSE_DELTA;
 		pulse_count_sensor.name = param_manager.getParameter<const char *>(key.c_str(), "NAME");
 		pulse_count_sensor.name += "_Pulse_Delta";
@@ -317,7 +298,7 @@ void InitializeI2c() {
 
 	if (ports.size() == 0) {
 		updateDisplay(DisplayTiming::I2C_INIT_PERIPHERAL_DONE);
-		HAL.println("Pass (No port available)!");
+		HAL.println("Skip (No port available)!");
 		return;
 	}
 
@@ -384,7 +365,7 @@ void InitializeI2cDevice() {
 		HAL.giveSemaphoreMutex("i2c");
 
 		if (res == I2C_IGNORE_DEVICE) {
-			HAL.println("Pass (ignore)!");
+			HAL.println("Skip (ignore)!");
 			continue;
 		}
 
@@ -448,16 +429,16 @@ void InitializeCameraDevice() {
 	HAL.print("Initialize Camera device... ");
 	updateDisplay(DisplayTiming::CAMERA_INIT_BEGIN);
 
-	if (strcmp(param_manager.getParameter<const char *>("CAMERA", "ENABLE"), "true") != 0) {
-		HAL.println("Pass (ignore)!");
+	if (param_manager.getParameter("CAMERA", "ENABLE", DEFAULT_FALSE) == false) {
+		HAL.println("Skip (ignore)!");
 		updateDisplay(DisplayTiming::CAMERA_INIT_DONE);
 		return;
 	}
 
 	bool result = HAL.Camera.begin();
 
-	if (!result) {
-		HAL.println("Pass (failed)!");
+	if (not result) {
+		HAL.println("Skip (failed)!");
 		updateDisplay(DisplayTiming::CAMERA_INIT_FAILED);
 		HAL.delay(10000);
 
@@ -494,7 +475,7 @@ void InitializeModbus() {
 
 	if (ports.size() == 0) {
 		updateDisplay(DisplayTiming::MODBUS_INIT_PERIPHERAL_DONE);
-		HAL.println("Pass (No port available)!");
+		HAL.println("Skip (No port available)!");
 		return;
 	}
 
@@ -558,7 +539,7 @@ void InitializeModbusDevice() {
 
 		int8_t res = modbus_device->initializeDevice(act_dev[i].port, act_dev[i].id);
 		if (res == MODBUS_IGNORE_DEVICE) {
-			HAL.println("Pass (ignore)!");
+			HAL.println("Skip (ignore)!");
 			continue;
 		}
 
@@ -682,7 +663,7 @@ void InitializeTimerInterrupt() {
 	/*================================================================================*/
 
 	/* Camera ========================================================================*/
-	if (HAL.Camera.isInstalled() && HAL.Camera.isReady()) {
+	if (HAL.Camera.isInstalled() and HAL.Camera.isReady()) {
 		ms_sampling = param_manager.getParameter<uint32_t>("SAMPLING", "CAMERA_MS");
 		ms_sampling = (ms_sampling < MINIMUM_INTERVAL_MS) ? MINIMUM_INTERVAL_MS : ms_sampling; // Minimum 1ms
 		if ((tx_interval_sec * 1000) < ms_sampling) {
@@ -705,16 +686,16 @@ void InitializeWiredLan() {
 	HAL.print("Initialize Wired Lan... ");
 
 	if (HAL.Lan.isSupported() == false) {
-		HAL.println("Pass (Not supported)");
+		HAL.println("Skip (Not supported)");
 		return;
 	}
 
 	updateDisplay(DisplayTiming::ETH_INIT_BEGIN);
 
-	const char *static_ip      = param_manager.getParameter<const char *>("WIFI", "STATIC_IP");
-	const char *static_gateway = param_manager.getParameter<const char *>("WIFI", "STATIC_GATEWAY");
-	const char *static_subnet  = param_manager.getParameter<const char *>("WIFI", "STATIC_SUBNET_MASK");
-	const char *dns            = param_manager.getParameter<const char *>("WIFI", "DNS");
+	const char *static_ip      = param_manager.getParameter<const char *>("LAN", "STATIC_IP");
+	const char *static_gateway = param_manager.getParameter<const char *>("LAN", "STATIC_GATEWAY");
+	const char *static_subnet  = param_manager.getParameter<const char *>("LAN", "STATIC_SUBNET_MASK");
+	const char *dns            = param_manager.getParameter<const char *>("LAN", "DNS");
 
 	if (HAL.Lan.begin(static_ip, static_gateway, static_subnet, dns)) {
 		HAL.printf("\n    Ethernet ready.\n");
@@ -735,11 +716,11 @@ void InitializeWiredLan() {
 //! @brief 無線 LAN 機能の初期化を行います
 void InitializeWirelessLan() {
 	HAL.print("Initialize Wireless Lan... \n");
-	if (param_manager.checkParameter("WIFI", "SSID") == false ||
-	    param_manager.checkParameter("WIFI", "PASS") == false ||
-	    param_manager.checkParameter("WIFI", "STATIC_IP") == false ||
-	    param_manager.checkParameter("WIFI", "STATIC_GATEWAY") == false ||
-	    param_manager.checkParameter("WIFI", "STATIC_SUBNET_MASK") == false ||
+	if (param_manager.checkParameter("WIFI", "SSID") == false or
+	    param_manager.checkParameter("WIFI", "PASS") == false or
+	    param_manager.checkParameter("WIFI", "STATIC_IP") == false or
+	    param_manager.checkParameter("WIFI", "STATIC_GATEWAY") == false or
+	    param_manager.checkParameter("WIFI", "STATIC_SUBNET_MASK") == false or
 	    param_manager.checkParameter("WIFI", "DNS") == false) {
 		// setting file might be broken
 		updateDisplay(DisplayTiming::WIFI_CONNECT_FAILED);
@@ -779,7 +760,7 @@ void InitializeWirelessLan() {
 	HAL.delay(2000);
 
 	updateDisplay(DisplayTiming::WIFI_TRY_CONNECT, ssid);
-	if (!HAL.Wlan.connectWlan(ssid, pass, 15000)) {
+	if (not HAL.Wlan.connectWlan(ssid, pass, 15000)) {
 		updateDisplay(DisplayTiming::WIFI_CONNECT_FAILED);
 
 		HAL.println("Failed!");
@@ -817,7 +798,7 @@ void InitializeNTP() {
 		// setting file might be broken
 		updateDisplay(DisplayTiming::NTP_SYNC_FAILED);
 		HAL.println("Failed!");
-		HAL.printf("Network (%d) setting might be broken.\n", key.c_str());
+		HAL.printf("Network (%s) setting might be broken.\n", key.c_str());
 		HAL.delay(10000);
 
 		HAL.reboot();
@@ -831,7 +812,7 @@ void InitializeNTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::NTP_CONNECT_WIFI);
-		while (!HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan()) {
 			// led_blue.toggle();
 			HAL.println("WiFi error");
 			HAL.println("Retry after 1sec.");
@@ -839,7 +820,6 @@ void InitializeNTP() {
 		}
 	}
 
-	// led_blue.off();
 	updateDisplay(DisplayTiming::NTP_SYNC_START);
 
 	bool res = false;
@@ -855,9 +835,8 @@ void InitializeNTP() {
 		break;
 	}
 
-	if (!res) {
+	if (not res) {
 		updateDisplay(DisplayTiming::NTP_SYNC_FAILED);
-		// led_blue.on();
 
 		HAL.println("Failed!");
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
@@ -910,7 +889,7 @@ void InitializeAmbient() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::AMBIENT_CONNECT_WIFI);
-		while (!HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan()) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -943,7 +922,7 @@ void InitializeFTP() {
 	tx_ftp->setFtpParam(ftp_server, ftp_user, ftp_pass, 1);
 
 	String ftp_dir = param_manager.getParameter<const char *>("FTP", "DIRECTORY");
-	if (!ftp_dir.endsWith("/")) {
+	if (not ftp_dir.endsWith("/")) {
 		ftp_dir += "/";
 	}
 
@@ -955,7 +934,7 @@ void InitializeFTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::FTP_CONNECT_WIFI);
-		while (!HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan()) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -988,7 +967,7 @@ void InitializeHTTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::HTTP_CONNECT_WIFI);
-		while (!HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan()) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -1025,13 +1004,13 @@ void InitializeMQTT() {
 	const char *broker_user = param_manager.getParameter<const char *>("MQTT", "USER");
 	const char *broker_pass = param_manager.getParameter<const char *>("MQTT", "PASS");
 	const char *base_topic  = param_manager.getParameter<const char *>("MQTT", "BASE_TOPIC");
-	bool retain             = (strcmp(param_manager.getParameter<const char *>("MQTT", "RETAIN"), "true") == 0);
+	bool retain             = param_manager.getParameter("MQTT", "RETAIN", DEFAULT_FALSE);
 	tx_mqtt->setMqttParam(broker, port, base_topic, broker_user, broker_pass, retain);
 	tx_mqtt->enableAutoDisconnectWiFi(false);
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::MQTT_CONNECT_WIFI);
-		while (!HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan()) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -1059,54 +1038,21 @@ void InitializeMQTT() {
 struct Features ReadFeatures() {
 	struct Features feat;
 
-	feat.wake_bat_enable = false;
-	if (param_manager.checkParameter("PARAM", "WAKE_BAT")) {
-		feat.wake_bat_enable = (strcmp(param_manager.getParameter<const char *>("PARAM", "WAKE_BAT"), "true") == 0);
-	}
+	feat.wake_bat_enable   = param_manager.getParameter("PARAM", "WAKE_BAT", DEFAULT_FALSE);
+	feat.camera_enable     = param_manager.getParameter("CAMERA", "ENABLE", DEFAULT_FALSE);
+	feat.ambient_enable    = param_manager.getParameter("AMBIENT", "ENABLE", DEFAULT_FALSE);
+	feat.ftp_enable        = param_manager.getParameter("FTP", "ENABLE", DEFAULT_FALSE);
+	feat.http_enable       = param_manager.getParameter("HTTP", "ENABLE", DEFAULT_FALSE);
+	feat.mqtt_enable       = param_manager.getParameter("MQTT", "ENABLE", DEFAULT_FALSE);
+	feat.batch_send_enable = param_manager.getParameter("PARAM", "BATCH_DATA_SEND", DEFAULT_FALSE);
 
-	feat.camera_enable = false;
-	if (HAL.Camera.isInstalled()) {
-		if (strcmp(param_manager.getParameter<const char *>("CAMERA", "ENABLE"), "true") == 0) {
-			feat.camera_enable = true;
-		}
-	}
+	feat.offline_mode = not(feat.ambient_enable or feat.ftp_enable or feat.http_enable or feat.mqtt_enable);
 
-	feat.ambient_enable = false;
-	if (param_manager.checkParameter("AMBIENT", "ENABLE") == true) {
-		feat.ambient_enable = (strcmp(param_manager.getParameter<const char *>("AMBIENT", "ENABLE"), "true") == 0);
-	}
-
-	feat.ftp_enable = false;
-	if (param_manager.checkParameter("FTP", "ENABLE") == true) {
-		feat.ftp_enable = (strcmp(param_manager.getParameter<const char *>("FTP", "ENABLE"), "true") == 0);
-	}
-
-	feat.http_enable = false;
-	if (param_manager.checkParameter("HTTP", "ENABLE") == true) {
-		feat.http_enable = (strcmp(param_manager.getParameter<const char *>("HTTP", "ENABLE"), "true") == 0);
-	}
-
-	feat.mqtt_enable = false;
-	if (param_manager.checkParameter("MQTT", "ENABLE") == true) {
-		feat.mqtt_enable = (strcmp(param_manager.getParameter<const char *>("MQTT", "ENABLE"), "true") == 0);
-	}
-
-	feat.batch_send_enable = false;
-	if (param_manager.checkParameter("PARAM", "BATCH_DATA_SEND") == true) {
-		feat.batch_send_enable = (strcmp(param_manager.getParameter<const char *>("PARAM", "BATCH_DATA_SEND"), "true") == 0);
-	}
-
-	feat.offline_mode = true;
-	feat.offline_mode = (!feat.offline_mode || feat.ambient_enable) ? false : true;
-	feat.offline_mode = (!feat.offline_mode || feat.ftp_enable) ? false : true;
-	feat.offline_mode = (!feat.offline_mode || feat.http_enable) ? false : true;
-	feat.offline_mode = (!feat.offline_mode || feat.mqtt_enable) ? false : true;
-
-	feat.wait_enable = (strcmp(param_manager.getParameter<const char *>("PARAM", "WAIT_00_SEC"), "true") == 0);
+	feat.wait_enable = param_manager.getParameter("PARAM", "WAIT_00_SEC", DEFAULT_FALSE);
 
 	constexpr uint8_t THRESHOLD_SEC = 30;
 	feat.tx_random_wait_enable      = false;
-	if (feat.wait_enable && HAL.Timer1.getSubTimerLimit("transmit") > THRESHOLD_SEC) {
+	if (feat.wait_enable and HAL.Timer1.getSubTimerLimit("transmit") > THRESHOLD_SEC) {
 		feat.tx_random_wait_enable = true;
 	}
 
@@ -1118,14 +1064,14 @@ struct Features ReadFeatures() {
 void WaitStartTiming() {
 	HAL.println("Wait timing 00 second...");
 	struct tm timeinfo = {0};
-	if (!HAL.NtpRtc.getCurrentTime(&timeinfo)) {
+	if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 		// TODO: Error handling
 	}
 
 	while (timeinfo.tm_sec != 0) {
 		updateDisplay(DisplayTiming::WAIT_START_TIMING, timeinfo.tm_sec);
 		HAL.delay(100);
-		if (!HAL.NtpRtc.getCurrentTime(&timeinfo)) {
+		if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 			// TODO: Error handling
 		}
 		HAL.update();
@@ -1174,7 +1120,7 @@ void UpdateSettings() {
 	for (auto section : doc.as<JsonObject>()) {
 		for (auto sub : doc[section.key().c_str()].as<JsonObject>()) {
 			JsonVariant error = root[section.key().c_str()][sub.key().c_str()];
-			if (!error.isNull()) {
+			if (not error.isNull()) {
 				// HAL.print(root[section.key().c_str()][sub.key().c_str()].as<const char *>());
 				// HAL.print("  ");
 				// HAL.print(section.key().c_str());

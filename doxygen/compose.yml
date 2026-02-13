@@ -29,11 +29,13 @@ services:
       USE_MDFILE_AS_MAINPAGE="README.md"
       INPUT="
         ./README.md \
+        ./notes/DEVICE_SETTINGS.md \
         ./notes/SUPPORTED_I2C_DEVICES.md \
         ./notes/SUPPORTED_MODBUS_DEVICES.md \
         ./notes/HOW_TO_ADD_I2C_SENSOR.md \
         ./notes/HOW_TO_ADD_I2C_SENSOR_TO_MANAGER.md \
         ./notes/HOW_TO_ADD_MODBUS_SENSOR.md \
+        ./notes/HOW_TO_ADD_MODBUS_SENSOR_TO_MANAGER.md \
         ./main.ino
         "
     container_name: doc-container

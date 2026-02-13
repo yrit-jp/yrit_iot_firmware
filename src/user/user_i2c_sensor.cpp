@@ -29,7 +29,7 @@ I2C_INIT_RESULT initializeUserI2cDevice(uint8_t port, uint8_t address, bool is_o
 		/* ここに新規センサの初期化処理を追加する（ここから）*/
 
 	case 0x3F:
-		if (!i2c_user_sensors[port][address].i2c_ct_unit) {
+		if (not i2c_user_sensors[port][address].i2c_ct_unit) {
 			// I2C_CT Unit
 			// unique_ptr を初期化する
 			i2c_user_sensors[port][address].i2c_ct_unit.reset(new I2C_CT_Unit());

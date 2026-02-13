@@ -3,6 +3,7 @@
 
 #include "../exceptional_sensor_value.h"
 #include "../hal/hal.h"
+#include "penalty_helper.h"
 
 #ifndef IOTTX_BUFFER_SIZE
 #define IOTTX_BUFFER_SIZE (128) //(256)
@@ -13,6 +14,28 @@ enum IoTTx_Tx_Result {
 	RESULT_TX_NOTHING   = 2, //!< 送信するデータはありませんでした
 	RESULT_TX_SOME_DATA = 4, //!< 一部データを送信しました
 	RESULT_TX_ALL_DATA  = 8  //!< すべてのデータを送信しました
+};
+
+enum class LogCategory : int {
+	AMBIENT,
+	AMBIENT_EX,
+	AMBIENT_HB,
+	FTP,
+	FTP_EX,
+	FTP_HB,
+	HTTP,
+	HTTP_EX,
+	HTTP_HB,
+	MQTT,
+	MQTT_EX,
+	MQTT_HB
+};
+
+enum class LogLevel : int {
+	Error,
+	Warning,
+	Info,
+	Debug,
 };
 
 class IoTTx {
@@ -57,10 +80,12 @@ public:
 	// =============================================================
 	template <typename T, typename U>
 	void addValue(struct tm time_stamp, T value, U name, String unit = "", uint8_t port = 0) {
-		while (_mutex) {
-			HAL.delay(1);
+		if (not preAddValue(String(name))) {
+			return;
 		}
-		_mutex                       = true;
+
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
+
 		_buffer[_tx_idx.store].time  = time_stamp;
 		_buffer[_tx_idx.store].value = String(value);
 		_buffer[_tx_idx.store].name  = String(name);
@@ -80,7 +105,7 @@ public:
 		                          ? _pending_data_count
 		                          : (_pending_data_count + 1);
 
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 	}
 
 	// ==============================================================
@@ -99,10 +124,11 @@ public:
 			return;
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
+		if (not preAddExceptionalValue(storage)) {
+			return;
 		}
-		_mutex = true;
+
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		_ex_buffer_info[storage].time    = time_stamp;
 		_ex_buffer_info[storage].name    = String(name);
@@ -114,7 +140,7 @@ public:
 		// グローバル変数は各 HAL クラスまたは ExceptionSensorValue.cpp で管理される
 		// 追加時は _EXCEPTIONAL_STORAGE_NUM の個数を調整すること
 
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 #endif /* HAL_ENABLE_EXCEPTIONAL_BUFFER */
 	}
 
@@ -125,17 +151,13 @@ public:
 
 	// ==============================================================
 	//! @brief 送信済みデータとバッファ格納済みデータのインデックスを表示する（通常センサデータ用）
-	//! @param[in] (str_begin) 先頭に付加する文字列
-	//! @param[in] (str_end) 文末に付加する文字列
 	// =============================================================
-	void printIndex(const char *str_begin = "", const char *str_end = "");
+	void printIndex();
 
 	// ==============================================================
 	//! @brief 送信済みデータとバッファ格納済みデータのインデックスを表示する（特殊なセンサデータ用）
-	//! @param[in] (str_begin) 先頭に付加する文字列
-	//! @param[in] (str_end) 文末に付加する文字列
 	// =============================================================
-	void printIndexEx(const char *str_begin = "", const char *str_end = "");
+	void printIndexEx();
 
 	//
 	//! @brief デバッグメッセージの表示
@@ -143,27 +165,22 @@ public:
 	//! @param[in] (prefix) 小項目識別子を指定する
 	//! @param[in] (msg) 本文
 	//! @param[in] (end) 文末に付加する文字列
-	void debugMessage(const char *category, const char *prefix, const char *msg, const char *end = "");
-
-	// ==============================================================
-	//! @brief 送信無限ループを実行します
-	//! @note この関数は基本的に使用しないでください
-	// =============================================================
-	void loop_forever();
+	// void debugMessage(const char *category, const char *prefix, const char *msg, const char *end = "");
+	void debugMessage(LogCategory log_category, LogLevel log_level, const char *msg, const char *end = "\n");
 
 	// ==============================================================
 	//! @brief 必要に応じて通常のセンサデータの送信を行います
 	//! @return 送信結果に応じたステータス変数（IoTTx_Tx_Result）
 	//! @note 送信バッファにデータがない場合は何もしません
 	// =============================================================
-	IoTTx_Tx_Result update();
+	virtual IoTTx_Tx_Result update();
 
 	// ==============================================================
 	//! @brief 必要に応じて特殊なセンサデータの送信を行います
 	//! @return 送信結果に応じたステータス変数（IoTTx_Tx_Result）
 	//! @note 送信バッファにデータがない場合は何もしません
 	// =============================================================
-	IoTTx_Tx_Result updateEx();
+	virtual IoTTx_Tx_Result updateEx();
 
 	// ==============================================================
 	//! @brief 送信バッファに溜まっている未送信データ数を取得します
@@ -204,6 +221,22 @@ public:
 
 protected:
 	// ==============================================================
+	//! @brief addValue の前処理を行います
+	//! @param[in] (name) データの名前
+	//! @return 処理を続行する場合は true, 中断する場合は false
+	//! @note 派生クラスでオーバーライドして個別の処理を追加できます
+	// =============================================================
+	virtual bool preAddValue(const String &name) { return true; }
+
+	// ==============================================================
+	//! @brief addExceptionalValue の前処理を行います
+	//! @param[in] (storage) ストレージ番号
+	//! @return 処理を続行する場合は true, 中断する場合は false
+	//! @note 派生クラスでオーバーライドして個別の処理を追加できます
+	// =============================================================
+	virtual bool preAddExceptionalValue(uint8_t storage) { return true; }
+
+	// ==============================================================
 	//! @brief 送信処理を行います（通常のセンサデータ用）
 	//! @return 送信結果に応じたステータス変数（IoTTx_Tx_Result）
 	//! @note 継承先で実装します
@@ -242,8 +275,11 @@ protected:
 	// =============================================================
 	String lld2String(signed long long val, int base = 10);
 
+	signed long long convertToUnixTime(const struct tm &struct_time, bool nano_sec);
+
 	String _devID;
 	String _sensName;
+	String _DEBUG_PREFIX = "IoTTx";
 
 	struct UNIX_TIME_CONFIG {
 		bool enable;
@@ -261,7 +297,7 @@ protected:
 		String unit;
 		uint8_t port;
 	};
-	static constexpr uint8_t _EXCEPTIONAL_STORAGE_NUM = 2;
+	static constexpr uint8_t _EXCEPTIONAL_STORAGE_NUM = EXCEPTIONAL_STORAGE_VALUE_NUM;
 	struct TX_EXCEPTIONAL_DATA_INFO _ex_buffer_info[_EXCEPTIONAL_STORAGE_NUM];
 
 	struct TX_DATA {
@@ -280,18 +316,35 @@ protected:
 	struct TX_INDEX _tx_idx;
 	int _pending_data_count;
 
-	struct Penalty {
-		bool enable;
-		unsigned long last_failed_millis;
-		uint16_t wait_ms;
-	};
-
 	String _wifi_ssid;
 	String _wifi_pass;
 	unsigned long _timeout_sec;
 
 	bool _auto_disconnect = true;
-	bool _mutex           = false;
+	String _mutex_key;
+};
+
+class EthernetMutexGuard {
+public:
+	EthernetMutexGuard() {
+		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
+			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
+			locked = true;
+		}
+	}
+
+	~EthernetMutexGuard() {
+		if (locked) {
+			HAL.Lan.giveSemaphoreMutex();
+		}
+	}
+
+	// コピーコンストラクタと代入演算子を削除
+	EthernetMutexGuard(const EthernetMutexGuard &)            = delete;
+	EthernetMutexGuard &operator=(const EthernetMutexGuard &) = delete;
+
+private:
+	bool locked = false;
 };
 
 #endif

@@ -59,7 +59,7 @@ if not exist ".\output\!TARGET!\!PROGRAM_DIR!\!vName!" (
 )
 
 arduino-cli.exe compile ^
---fqbn=m5stack:esp32:m5stack_stickc_plus2:PSRAM=enabled,PartitionScheme=default_8MB,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=8M,UploadSpeed=1500000,LoopCore=1,EventsCore=1,DebugLevel=none ^
+--fqbn=m5stack:esp32:m5stack_stickc_plus2:PSRAM=disabled,PartitionScheme=default_8MB,CPUFreq=240,FlashMode=qio,FlashFreq=80,FlashSize=8M,UploadSpeed=1500000,LoopCore=1,EventsCore=1,DebugLevel=none ^
 --libraries !USERPROFILE!\AppData\Local\Arduino15\libraries ^
 --libraries !PROJECT_ROOT!\libraries\common ^
 --libraries !PROJECT_ROOT!\libraries\m5stack ^
@@ -76,8 +76,8 @@ if errorlevel 1 (
   powershell -Command "Write-Host '  arduino-cli compile error occurred.' -ForegroundColor Red"
   powershell -Command "Write-Host '========================================' -ForegroundColor Red"
   echo.
-  pause
-  exit /b 1
+  set BUILD_STATUS=FAILED
+  goto :finish
 )
 
 REM 一括リネーム
@@ -100,6 +100,23 @@ REM 不要ファイルの削除
 del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.map
 del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.elf
 
+REM 成功時の処理
+set BUILD_STATUS=SUCCESS
+
+:finish
+echo.
+echo Finish. Target: !TARGET!
+if "!BUILD_STATUS!"=="SUCCESS" (
+  powershell -Command "Write-Host 'Build Status: SUCCESS' -ForegroundColor Green"
+) else (
+  powershell -Command "Write-Host 'Build Status: FAILED' -ForegroundColor Red"
+)
+echo.
+
 REM 終了時にベルを鳴らす
 echo 
 pause
+
+REM エラーステータスで終了
+if "!BUILD_STATUS!"=="FAILED" exit /b 1
+exit /b 0

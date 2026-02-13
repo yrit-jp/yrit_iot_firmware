@@ -5,14 +5,17 @@
 #endif
 
 bool IoTTxHTTP::setUrl(String url) {
+	_mutex_key    = "iot_tx_http";
+	_DEBUG_PREFIX = "HTTP";
+
 	struct HttpHelper::UniformResourceLocator result;
 	if (HttpHelper::tryParseUrl(url, result) == false) {
 		return false;
 	}
 	_target = result;
 
-	if (_target.protocol != "http" && _target.protocol != "https") {
-		debugMessage("Http", "Error", ("Unsupported protocol: " + _target.protocol).c_str());
+	if (_target.protocol != "http" and _target.protocol != "https") {
+		debugMessage(LogCategory::HTTP, LogLevel::Error, ("Unsupported protocol: " + _target.protocol).c_str());
 		return false;
 	}
 
@@ -23,33 +26,27 @@ bool IoTTxHTTP::setUrl(String url) {
 	//_target.path = "www." + _target.path;
 
 	HAL.println("");
-	debugMessage("Http", "Info: Protocol", _target.protocol.c_str(), "\n");
-	debugMessage("Http", "Info: Port    ", String(_target.port).c_str(), "\n");
-	debugMessage("Http", "Info: Host    ", _target.host.c_str(), "\n");
-	debugMessage("Http", "Info: Path    ", _target.path.c_str(), "\n");
+	debugMessage(LogCategory::HTTP, LogLevel::Info, ("Protocol: " + _target.protocol).c_str());
+	debugMessage(LogCategory::HTTP, LogLevel::Info, ("Port    : " + String(_target.port)).c_str());
+	debugMessage(LogCategory::HTTP, LogLevel::Info, ("Host    : " + _target.host).c_str());
+	debugMessage(LogCategory::HTTP, LogLevel::Info, ("Path    : " + _target.path).c_str());
 
 	return true;
 }
 
 IoTTx_Tx_Result IoTTxHTTP::transmit() {
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
-	constexpr bool ENABLE_RECREATE      = true;
-	Client *my_client                   = nullptr;
+	enum IoTTx_Tx_Result result    = RESULT_TX_ERROR;
+	constexpr bool ENABLE_RECREATE = true;
+	Client *my_client              = nullptr;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 
@@ -58,9 +55,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 
@@ -72,19 +67,13 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 	}
 
 	if (my_client == nullptr) {
-		debugMessage("Http", "Error", "Failed to begin HTTP client.", "\n");
+		debugMessage(LogCategory::HTTP, LogLevel::Error, "Failed to begin HTTP client.");
 		return RESULT_TX_ERROR;
 	}
 
 	while (_tx_idx.store != _tx_idx.transmit) {
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex = true;
-
-		////////////////
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
 			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
 		}
 
@@ -92,9 +81,10 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
 			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
-		////////////////
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
+
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		JsonDocument payload;
 		payload["devID"]    = _devID;
@@ -119,71 +109,51 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 		}
 
 		if (_unix_time_field.enable) {
-			signed long long ts = mktime(&_buffer[_tx_idx.transmit].time);
-			_mutex              = false;
-			if (ts != -1) {
-				String s = lld2String(ts);
-				String p = _unix_time_field.nano_precision ? "000000000" : "";
+			constexpr bool nano_precision = true;
 
-				// Translate String to signed long long
-				errno = 0;
-				ts    = strtoll((String(s) + p).c_str(), NULL, 10);
-				if (errno != ERANGE) {
-					payload["time"] = ts;
-				}
-			}
+			payload["time"] = convertToUnixTime(_buffer[_tx_idx.transmit].time, nano_precision);
 		}
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 
 		char buffer[256] = {'\0'};
 		serializeJson(payload, buffer, sizeof(buffer));
 
 		int response_code;
 		{
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-				HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-			}
-
+			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+			EthernetMutexGuard _;
 			http_client.post(_target.path, "application/json", buffer);
 			response_code = http_client.responseStatusCode();
-
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				HAL.Lan.giveSemaphoreMutex();
-				/* -+-+-+-+- Mutex block END -+-+-+-+- */
-			}
+			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
 
 		switch (response_code) {
 		case 200:
 			/* fallthrough */
 		case 302:
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex              = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_tx_idx.transmit    = ((_tx_idx.transmit + 1) == IOTTX_BUFFER_SIZE) ? 0 : (_tx_idx.transmit + 1);
 			_pending_data_count = (((_pending_data_count - 1) > 0) ? (_pending_data_count - 1) : 0);
-			_mutex              = false;
-			result              = RESULT_TX_SOME_DATA;
-			// printIndex("Http:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 			break;
 		default:
-			debugMessage("Http", "Error", "Failed to POST.", "\n");
-			debugMessage("Http", "Error", ("Return code: " + String(response_code)).c_str(), "\n");
+			debugMessage(LogCategory::HTTP, LogLevel::Error, "Failed to POST.");
+			debugMessage(LogCategory::HTTP, LogLevel::Error, ("Return code: " + String(response_code)).c_str());
 			// http_client.end();
 			switch (response_code) {
 			case -1:
-				debugMessage("Http Ex", "Error", "CONNECTION_FAILED", "\n");
+				debugMessage(LogCategory::HTTP, LogLevel::Error, "CONNECTION_FAILED");
 				break;
 			case -2:
-				debugMessage("Http Ex", "Error", "API_INVALID", "\n");
+				debugMessage(LogCategory::HTTP, LogLevel::Error, "API_INVALID");
 				break;
 			case -3:
-				debugMessage("Http Ex", "Error", "TIMED_OUT", "\n");
+				debugMessage(LogCategory::HTTP, LogLevel::Error, "TIMED_OUT");
 				break;
 			case -4:
-				debugMessage("Http Ex", "Error", "INVALID_RESPONSE_CODE", "\n");
+				debugMessage(LogCategory::HTTP, LogLevel::Error, "INVALID_RESPONSE_CODE");
 				break;
 			default:
 				break;
@@ -195,9 +165,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 				}
 			}
 
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+			_penalty_wait.activate(1000);
 			return result;
 		}
 	}
@@ -213,24 +181,18 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 
 IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
-	constexpr bool ENABLE_RECREATE      = true;
-	Client *my_client                   = nullptr;
+	enum IoTTx_Tx_Result result    = RESULT_TX_ERROR;
+	constexpr bool ENABLE_RECREATE = true;
+	Client *my_client              = nullptr;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 
@@ -239,9 +201,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 
@@ -253,7 +213,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 	}
 
 	if (my_client == nullptr) {
-		debugMessage("Http Ex", "Error", "Failed to begin HTTP client.", "\n");
+		debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "Failed to begin HTTP client.");
 		return RESULT_TX_ERROR;
 	}
 
@@ -263,14 +223,8 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 			continue;
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex = true;
-
-		////////////////
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
 			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
 		}
 
@@ -278,9 +232,10 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
 			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
-		////////////////
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
+
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		JsonDocument payload_ex;
 		payload_ex["devID"]    = _devID;
@@ -293,105 +248,106 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 
 		if (storage == 0) {
 			// For storage number 0
+			static char *tmp_arr       = nullptr;
+			static size_t tmp_arr_size = 0;
+
 			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			unsigned int len = base64::encodeLength(HAL.Camera.jpgImage.size());
-			char *tmp_arr    = new char[len + 1]();
+			HAL.giveSemaphoreMutex("camera");
 
+			if (tmp_arr_size < len + 1) {
+				delete[] tmp_arr;
+				tmp_arr = new char[len + 1]();
+				if (tmp_arr == nullptr) {
+					// メモリ確保に失敗した
+					debugMessage(LogCategory::HTTP_EX, LogLevel::Error,
+					             ("Failed alloc buffer. Size: " + String(len + 1)).c_str());
+					HAL.giveSemaphoreMutex(_mutex_key);
+					return result;
+				}
+				tmp_arr_size = len + 1;
+			}
+			memset(tmp_arr, 0, tmp_arr_size);
+
+			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			base64::encode(&HAL.Camera.jpgImage[0], HAL.Camera.jpgImage.size(), tmp_arr);
 			HAL.giveSemaphoreMutex("camera");
 
 			auto value = payload_ex["value"].to<JsonObject>();
 			if (copyArray(tmp_arr, value) == false) {
 				// failed to copy
-				debugMessage("Http Ex", "Error",
-				             String("Failed to copy image. Size: " + String(len)).c_str(), "\n");
-				_mutex = false;
+				debugMessage(LogCategory::HTTP_EX, LogLevel::Error,
+				             String("Failed to copy image. Size: " + String(len)).c_str());
+				HAL.giveSemaphoreMutex(_mutex_key);
 				return result;
 			}
 
-			delete[] tmp_arr;
 		} else if (storage == 1) {
 			payload_ex.remove("unit");
 
 			HAL.takeSemaphoreMutex("ex_sensor_data", portMAX_DELAY);
-
 			payload_ex["sensors"] = ex_sensor_data;
-
 			HAL.giveSemaphoreMutex("ex_sensor_data");
 		} else {
-			_mutex = false;
-			break;
+			HAL.giveSemaphoreMutex(_mutex_key);
+			continue;
 		}
 
 		if (_unix_time_field.enable) {
-			signed long long ts = mktime(&_ex_buffer_info[storage].time);
-			_mutex              = false;
-			if (ts != -1) {
-				String s = lld2String(ts);
-				String p = _unix_time_field.nano_precision ? "000000000" : "";
+			constexpr bool nano_precision = true;
+			payload_ex["time"]            = convertToUnixTime(_ex_buffer_info[storage].time, nano_precision);
+		}
+		HAL.giveSemaphoreMutex(_mutex_key);
 
-				// Translate String to signed long long
-				errno = 0;
-				ts    = strtoll((String(s) + p).c_str(), NULL, 10);
-				if (errno != ERANGE) {
-					payload_ex["time"] = ts;
-				}
+		static char *buffer = nullptr;
+		if (buffer == nullptr) {
+			buffer = new char[HAL_HTTP_MAX_PACKET_SIZE]();
+			if (buffer == nullptr) {
+				// メモリ確保の初期化に失敗した
+				// 最初の１回だけ呼び出されるはずなので、再起動させエラーを知らせる
+				HAL.reboot();
 			}
 		}
-		_mutex = false;
-
-		uint32_t BUF_LEN = measureJson(payload_ex) + 1;
-		char *buffer     = new char[BUF_LEN];
-		memset(buffer, '\0', BUF_LEN);
-		serializeJson(payload_ex, buffer, BUF_LEN);
+		memset(buffer, 0, HAL_HTTP_MAX_PACKET_SIZE);
+		serializeJson(payload_ex, buffer, HAL_HTTP_MAX_PACKET_SIZE);
 		// HAL.println(buffer);
 
 		int response_code;
 		{
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-				HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-			}
-
+			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+			EthernetMutexGuard _;
 			http_client.post(_target.path, "application/json", buffer);
 			response_code = http_client.responseStatusCode();
-
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				HAL.Lan.giveSemaphoreMutex();
-				/* -+-+-+-+- Mutex block END -+-+-+-+- */
-			}
+			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
 
-		delete[] buffer;
+		// delete[] buffer;
 		switch (response_code) {
 		case 200:
 			/* fallthrough */
 		case 302:
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex                           = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_ex_buffer_info[storage].updated = false;
-			_mutex                           = false;
-			result                           = RESULT_TX_SOME_DATA;
-			// printIndex("Http:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 			break;
 		default:
-			debugMessage("Http Ex", "Error", "Failed to POST.", "\n");
-			debugMessage("Http Ex", "Error", ("Return code: " + String(response_code)).c_str(), "\n");
+			debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "Failed to POST.");
+			debugMessage(LogCategory::HTTP_EX, LogLevel::Error, ("Return code: " + String(response_code)).c_str());
 			// http_client.end();
 			switch (response_code) {
 			case -1:
-				debugMessage("Http Ex", "Error", "CONNECTION_FAILED", "\n");
+				debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "CONNECTION_FAILED");
 				break;
 			case -2:
-				debugMessage("Http Ex", "Error", "API_INVALID", "\n");
+				debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "API_INVALID");
 				break;
 			case -3:
-				debugMessage("Http Ex", "Error", "TIMED_OUT", "\n");
+				debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "TIMED_OUT");
 				break;
 			case -4:
-				debugMessage("Http Ex", "Error", "INVALID_RESPONSE_CODE", "\n");
+				debugMessage(LogCategory::HTTP_EX, LogLevel::Error, "INVALID_RESPONSE_CODE");
 				break;
 			default:
 				break;
@@ -403,9 +359,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 				}
 			}
 
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+			_penalty_wait.activate(1000);
 			return result;
 		}
 	}

@@ -2,15 +2,23 @@
 
 struct Features features;
 struct TxEvent_t txEventFlag = {false, false, false};
+std::vector<TransmitterEntry> transmitters;
 
 // ==================================================================
 // MARK: setup
 //! @brief 初期化処理
 //! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
 //! @details 主な機能はセンサデータの取得、バッファへの格納、表示更新
-// ==================================================================。
+// ==================================================================
 void setup() {
 	HAL.begin();
+	HAL.printf("Firmware Version: %d.%d %s\n",
+	           APP_MAIN_VERSION,
+	           APP_MINOR_VERSION,
+	           APP_RELEASE_TAG);
+	HAL.println(ASCII_ART);
+
+	// Initialize Mutex
 	HAL.initializeSemaphoreMutex("i2c");
 	HAL.initializeSemaphoreMutex("ex_sensor_data");
 	HAL.Display.initializeSemaphoreMutex();
@@ -65,7 +73,7 @@ void setup() {
 	InitializeCameraDevice();
 
 	struct tm timeinfo = {0};
-	if (!features.offline_mode) {
+	if (not features.offline_mode) {
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::UNKNOWN) {
 			// Initialize Wired LAN
 			InitializeWiredLan();
@@ -79,7 +87,7 @@ void setup() {
 		// Sync Time
 		InitializeNTP();
 
-		if (!HAL.NtpRtc.getCurrentTime(&timeinfo)) {
+		if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 			HAL.println("Get localtime error");
 			updateDisplay(DisplayTiming::NTP_SYNC_FAILED);
 			HAL.delay(10000);
@@ -94,21 +102,50 @@ void setup() {
 	if (features.ambient_enable) {
 		// Ambient initialize
 		InitializeAmbient();
-		tx_ambient->updateHeartbeat(timeinfo);
+		TransmitterEntry entry;
+		entry.tx                           = tx_ambient.get();
+		entry.display_timing.init_begin    = DisplayTiming::AMBIENT_INIT_BEGIN;
+		entry.display_timing.connect_wifi  = DisplayTiming::AMBIENT_CONNECT_WIFI;
+		entry.display_timing.buffer_update = DisplayTiming::AMBIENT_BUFFER_UPDATE;
+		entry.display_timing.init_done     = DisplayTiming::AMBIENT_INIT_DONE;
+		transmitters.push_back(entry);
 	}
 	if (features.ftp_enable) {
 		// FTP initialize
 		InitializeFTP();
-		tx_ftp->updateHeartbeat(timeinfo);
+		TransmitterEntry entry;
+		entry.tx                           = tx_ftp.get();
+		entry.display_timing.init_begin    = DisplayTiming::FTP_INIT_BEGIN;
+		entry.display_timing.connect_wifi  = DisplayTiming::FTP_CONNECT_WIFI;
+		entry.display_timing.buffer_update = DisplayTiming::FTP_BUFFER_UPDATE;
+		entry.display_timing.init_done     = DisplayTiming::FTP_INIT_DONE;
+		transmitters.push_back(entry);
 	}
 	if (features.http_enable) {
 		InitializeHTTP();
-		tx_http->updateHeartbeat(timeinfo);
+		TransmitterEntry entry;
+		entry.tx                           = tx_http.get();
+		entry.display_timing.init_begin    = DisplayTiming::HTTP_INIT_BEGIN;
+		entry.display_timing.connect_wifi  = DisplayTiming::HTTP_CONNECT_WIFI;
+		entry.display_timing.buffer_update = DisplayTiming::HTTP_BUFFER_UPDATE;
+		entry.display_timing.init_done     = DisplayTiming::HTTP_INIT_DONE;
+		transmitters.push_back(entry);
 	}
 	if (features.mqtt_enable) {
 		// MQTT initialize
 		InitializeMQTT();
-		tx_mqtt->updateHeartbeat(timeinfo);
+		TransmitterEntry entry;
+		entry.tx                           = tx_mqtt.get();
+		entry.display_timing.init_begin    = DisplayTiming::MQTT_INIT_BEGIN;
+		entry.display_timing.connect_wifi  = DisplayTiming::MQTT_CONNECT_WIFI;
+		entry.display_timing.buffer_update = DisplayTiming::MQTT_BUFFER_UPDATE;
+		entry.display_timing.init_done     = DisplayTiming::MQTT_INIT_DONE;
+		transmitters.push_back(entry);
+	}
+
+	// 全トランスミッターのハートビートを更新
+	for (auto &entry : transmitters) {
+		entry.tx->updateHeartbeat(timeinfo);
 	}
 
 	// Initialize timer interrupt
@@ -140,13 +177,13 @@ void setup() {
 	// Create Transmit Task
 	HAL_REGISTER_TRANSMIT_TASK();
 
-	if (!features.offline_mode) {
+	if (not features.offline_mode) {
 		if (features.wait_enable) {
 			WaitStartTiming();
 		}
 
 		// Setup timer correction
-		if (!HAL.NtpRtc.getCurrentTime(&timeinfo)) {
+		if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 			// TODO: Error handling
 		}
 		TxTimingHelper::begin(timeinfo, HAL.Info.TX_INTERVAL_SEC);
@@ -184,8 +221,8 @@ void loop() {
 		// Interrupt every 100 ms
 		// HAL.println("Interrupted OK Timer2");
 
-		if (!features.offline_mode) {
-			if (!HAL.NtpRtc.getCurrentTime(&timeinfo)) {
+		if (not features.offline_mode) {
+			if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 				HAL.println("Get localtime error");
 				return;
 			}
@@ -206,17 +243,8 @@ void loop() {
 			updateDisplay(DisplayTiming::EVERY_ONE_MINUTES_EVENT);
 
 			// Heartbeat tx set
-			if (features.ambient_enable) {
-				tx_ambient->updateHeartbeat(timeinfo);
-			}
-			if (features.ftp_enable) {
-				tx_ftp->updateHeartbeat(timeinfo);
-			}
-			if (features.http_enable) {
-				tx_http->updateHeartbeat(timeinfo);
-			}
-			if (features.mqtt_enable) {
-				tx_mqtt->updateHeartbeat(timeinfo);
+			for (auto &entry : transmitters) {
+				entry.tx->updateHeartbeat(timeinfo);
 			}
 		}
 
@@ -235,7 +263,7 @@ void loop() {
 		HAL.delay(5);
 	}
 
-	if (HAL.Timer2.checkSubTimer("gpio") == true ||
+	if (HAL.Timer2.checkSubTimer("gpio") == true or
 	    txEventFlag.transmit == true) {
 		// GPIO sampling interrupt
 
@@ -247,8 +275,8 @@ void loop() {
 		printSensorData(false, TYPE_GPIO | TYPE_PULSE_TOTAL | TYPE_PULSE_DELTA);
 	}
 
-	if (HAL.Timer2.checkSubTimer("i2c") == true ||
-	    txEventFlag.link_i2c == true ||
+	if (HAL.Timer2.checkSubTimer("i2c") == true or
+	    txEventFlag.link_i2c == true or
 	    txEventFlag.transmit == true) {
 		// I2C sampling interrupt
 
@@ -261,11 +289,11 @@ void loop() {
 		printSensorData(false, TYPE_I2C);
 	}
 
-	if (HAL.Timer2.checkSubTimer("camera") == true ||
+	if (HAL.Timer2.checkSubTimer("camera") == true or
 	    txEventFlag.transmit == true) {
 		// Camera sampling interrupt
 
-		if (features.camera_enable && HAL.Camera.isReady()) {
+		if (features.camera_enable and HAL.Camera.isReady()) {
 			// HAL.println("[Info] Camera sensor updated!");
 			updateValue(TYPE_CAMERA);
 			updateDisplay(DisplayTiming::SAMPLING_CAMERA_SENSOR, timeinfo);
@@ -273,8 +301,8 @@ void loop() {
 		printSensorData(false, TYPE_CAMERA);
 	}
 
-	if (HAL.Timer2.checkSubTimer("modbus") == true ||
-	    txEventFlag.link_modbus == true ||
+	if (HAL.Timer2.checkSubTimer("modbus") == true or
+	    txEventFlag.link_modbus == true or
 	    txEventFlag.transmit == true) {
 		// Modbus sampling interrupt
 
@@ -287,7 +315,7 @@ void loop() {
 	}
 
 	// Store fetch values
-	if (txEventFlag.transmit == true || txEventFlag.on_change_transmit == true) {
+	if (txEventFlag.transmit == true or txEventFlag.on_change_transmit == true) {
 		if (txEventFlag.transmit == true) {
 			// Ex は容量が大きいので定期送信のみに限定
 			storeExceptionalValue(timeinfo); // storeValue でセンサフラグを管理しているため、Ex の方を先に処理する
@@ -342,7 +370,7 @@ void userInteractiveLoop(void *pvParameters) {
 // ==================================================================
 void transmitLoop(void *pvParameters) {
 	if (features.offline_mode) {
-		while (1) {
+		while (true) {
 			HAL.delay(1000);
 			if (HAL.Timer1.checkSubTimer("one_seconds_in_transmit") == true) {
 			}
@@ -351,104 +379,36 @@ void transmitLoop(void *pvParameters) {
 		}
 	}
 
-	while (1) {
+	while (true) {
 		/* Transmit BEGIN */
 		if (features.tx_random_wait_enable) {
 			// Random wait
 			HAL.delay(HAL.getRandomNumber(0, 300) * 10);
 		}
 
-		if (features.ambient_enable) {
-			tx_ambient->update();
-			tx_ambient->updateEx();
-
-			if (!tx_ambient->transmitHeartbeat()) {
-				// No data transmit
-			}
-		}
-
-		if (features.ftp_enable) {
-			tx_ftp->update();
-			tx_ftp->updateEx();
-
-			if (!tx_ftp->transmitHeartbeat()) {
-				// No data transmit
-			}
-		}
-
-		if (features.http_enable) {
-			tx_http->update();
-			tx_http->updateEx();
-
-			if (!tx_http->transmitHeartbeat()) {
-				// No data transmit
-			}
-		}
-
-		if (features.mqtt_enable) {
-			tx_mqtt->clientLoop();
-			tx_mqtt->update();
-			tx_mqtt->clientLoop();
-			tx_mqtt->updateEx();
-
-			if (!tx_mqtt->transmitHeartbeat()) {
-				// No data transmit
-			}
+		for (auto &entry : transmitters) {
+			entry.tx->update();
+			entry.tx->updateEx();
+			entry.tx->transmitHeartbeat();
 		}
 		/* Transmit END */
 
 		HAL.delay(5);
 
 		/* Update Display BEGIN */
-
-		if (features.ambient_enable) {
-			if ((tx_ambient->getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::AMBIENT_BUFFER_UPDATE, tx_ambient->getPendingDataQuantity());
-				tx_ambient->printIndex("Ambient:", "\n");
+		for (auto &entry : transmitters) {
+			if ((entry.tx->getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
+				updateDisplay(entry.display_timing.buffer_update, entry.tx->getPendingDataQuantity());
+				entry.tx->printIndex();
 			}
-			if ((tx_ambient->getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::AMBIENT_BUFFER_UPDATE, tx_ambient->getPendingDataQuantity());
-				tx_ambient->printIndexEx("Ambient:", "\n");
-			}
-		}
-
-		if (features.ftp_enable) {
-			if ((tx_ftp->getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::FTP_BUFFER_UPDATE, tx_ftp->getPendingDataQuantity());
-				tx_ftp->printIndex("FTP:", "\n");
-			}
-			if ((tx_ftp->getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::FTP_BUFFER_UPDATE, tx_ftp->getPendingDataQuantity());
-				tx_ftp->printIndexEx("FTP:", "\n");
+			if ((entry.tx->getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
+				updateDisplay(entry.display_timing.buffer_update, entry.tx->getPendingDataQuantity());
+				entry.tx->printIndexEx();
 			}
 		}
-
-		if (features.http_enable) {
-			if ((tx_http->getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::HTTP_BUFFER_UPDATE, tx_http->getPendingDataQuantity());
-				tx_http->printIndex("HTTP:", "\n");
-			}
-			if ((tx_http->getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::HTTP_BUFFER_UPDATE, tx_http->getPendingDataQuantity());
-				tx_http->printIndexEx("HTTP:", "\n");
-			}
-		}
-
-		if (features.mqtt_enable) {
-			if ((tx_mqtt->getLastResult() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::MQTT_BUFFER_UPDATE, tx_mqtt->getPendingDataQuantity());
-				tx_mqtt->printIndex("MQTT:", "\n");
-			}
-			if ((tx_mqtt->getLastResultEx() & (RESULT_TX_NOTHING | RESULT_TX_ERROR)) == 0) {
-				updateDisplay(DisplayTiming::MQTT_BUFFER_UPDATE, tx_mqtt->getPendingDataQuantity());
-				tx_mqtt->printIndexEx("MQTT:", "\n");
-			}
-		}
-
 		/* Update Display END */
 
-		/*** periodic process ***/
-
+		/* periodic process */
 		if (HAL.Timer1.checkSubTimer("one_seconds_in_transmit") == true) {
 		}
 		if (HAL.Timer1.checkSubTimer("one_minutes_in_transmit") == true) {
@@ -496,7 +456,7 @@ void updateValue(uint16_t target, int target_index) {
 			sensors[i].updated     = true;
 			sensors[i].tx_buffered = false;
 
-			if (!sensors[i].GPIO.digital) {
+			if (not sensors[i].GPIO.digital) {
 				// 最大値の時は量子化しない
 				if (((1U << HAL.Gpio.getAdcBits()) - 1) != sensors[i].i_value.latest) {
 					// ((a >> x) << x)
@@ -546,8 +506,8 @@ void updateValue(uint16_t target, int target_index) {
 			sensors[i].tx_buffered    = false;
 
 		} else if (sensors[i].type == TYPE_I2C) {
-			if (sensors[i].display == false &&
-			    sensors[i].I2C.sub_id != 0 &&
+			if (sensors[i].display == false and
+			    sensors[i].I2C.sub_id != 0 and
 			    txEventFlag.transmit == false) {
 				// 画面表示不要かつ送信不要の場合は高速化のためスキップ
 				continue;
@@ -571,36 +531,30 @@ void updateValue(uint16_t target, int target_index) {
 			    &s_data);
 			HAL.giveSemaphoreMutex("i2c");
 
-			sensors[i].I2C.result = result;
+			sensors[i].I2C.result  = result;
+			sensors[i].updated     = true;
+			sensors[i].tx_buffered = false;
 
 			if (result == I2C_RES_FAILED) {
 				// Failed to get data
 				// HAL.printf("Error %s\n", sensors[i].name.c_str());
-				sensors[i].updated     = true;
-				sensors[i].tx_buffered = false;
 				continue;
 			}
 
 			if ((result & I2C_RES_INT) != 0) {
 				sensors[i].i_value.prev   = sensors[i].i_value.latest;
 				sensors[i].i_value.latest = i_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
 			if ((result & I2C_RES_DOUBLE) != 0) {
 				sensors[i].d_value.prev   = sensors[i].d_value.latest;
 				sensors[i].d_value.latest = d_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
 			if ((result & I2C_RES_STRING) != 0) {
 				sensors[i].s_value.latest = s_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
-		} else if (sensors[i].type == TYPE_MODBUS && modbus_device) {
-			if (sensors[i].display == false &&
-			    sensors[i].MODBUS.sub_id != 0 &&
+		} else if (sensors[i].type == TYPE_MODBUS and modbus_device) {
+			if (sensors[i].display == false and
+			    sensors[i].MODBUS.sub_id != 0 and
 			    txEventFlag.transmit == false) {
 				// 画面表示不要かつ送信不要の場合は高速化のためスキップ
 				continue;
@@ -619,37 +573,31 @@ void updateValue(uint16_t target, int target_index) {
 			    &i_data,
 			    &s_data);
 			sensors[i].MODBUS.result = result;
+			sensors[i].updated       = true;
+			sensors[i].tx_buffered   = false;
 
 			if (result == MODBUS_RES_FAILED) {
 				// Failed to get data
 				// HAL.printf("Error %s\n", sensors[i].name.c_str());
-				sensors[i].updated     = true;
-				sensors[i].tx_buffered = false;
 				continue;
 			}
 
 			if ((result & MODBUS_RES_INT) != 0) {
 				sensors[i].i_value.prev   = sensors[i].i_value.latest;
 				sensors[i].i_value.latest = i_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
 			if ((result & MODBUS_RES_DOUBLE) != 0) {
 				sensors[i].d_value.prev   = sensors[i].d_value.latest;
 				sensors[i].d_value.latest = d_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
 			if ((result & MODBUS_RES_STRING) != 0) {
 				sensors[i].s_value.latest = s_data;
-				sensors[i].updated        = true;
-				sensors[i].tx_buffered    = false;
 			}
 		} else if (sensors[i].type == TYPE_CAMERA) {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
 			sensors[i].CAMERA.captured = false;
 
-			if (sensors[i].display == false &&
+			if (sensors[i].display == false and
 			    txEventFlag.transmit == false) {
 				// 画面表示不要かつ送信不要の場合は高速化のためスキップ
 				continue;
@@ -666,6 +614,14 @@ void updateValue(uint16_t target, int target_index) {
 			HAL.giveSemaphoreMutex("camera");
 #endif /* HAL_ENABLE_EXCEPTIONAL_BUFFER */
 		}
+	}
+}
+
+template <typename ValueType>
+void addValueToBuffer(struct tm &timeinfo, const struct Sensor &sensor, ValueType value) {
+	for (auto &entry : transmitters) {
+		entry.tx->addValue(timeinfo, value, sensor.name, sensor.unit, sensor.port);
+		entry.tx->printIndex();
 	}
 }
 
@@ -686,7 +642,7 @@ void storeValue(struct tm timeinfo) {
 		flag_updated = true;
 
 		if (sensors[i].type == TYPE_GPIO) {
-			if (txEventFlag.on_change_transmit == true && txEventFlag.transmit == false) {
+			if (txEventFlag.on_change_transmit == true and txEventFlag.transmit == false) {
 				if (sensors[i].tx_on_change == false) {
 					// 変更時トリガの対象ではない
 					continue;
@@ -697,427 +653,98 @@ void storeValue(struct tm timeinfo) {
 				}
 			}
 
+			addValueToBuffer(timeinfo, sensors[i], sensors[i].i_value.latest);
 			HAL.printf("%s buffered! -> %d %s\n",
 			           sensors[i].name.c_str(),
 			           sensors[i].i_value.latest,
 			           sensors[i].unit.c_str());
-
-			if (features.ambient_enable) {
-				if (tx_ambient->isTargetSensor(sensors[i].name)) {
-					tx_ambient->addValue(timeinfo,
-					                     sensors[i].i_value.latest,
-					                     sensors[i].name,
-					                     sensors[i].unit,
-					                     sensors[i].port);
-					tx_ambient->printIndex("Ambient:", "\n");
-				}
-			}
-
-			if (features.ftp_enable) {
-				tx_ftp->addValue(timeinfo,
-				                 sensors[i].i_value.latest,
-				                 sensors[i].name,
-				                 sensors[i].unit,
-				                 sensors[i].port);
-				tx_ftp->printIndex("FTP:", "\n");
-			}
-
-			if (features.http_enable) {
-				tx_http->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_http->printIndex("HTTP:", "\n");
-			}
-
-			if (features.mqtt_enable) {
-				tx_mqtt->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_mqtt->printIndex("MQTT:", "\n");
-			}
 		} else if (sensors[i].type == TYPE_PULSE_TOTAL) {
 			if (txEventFlag.transmit == false) {
 				continue;
 			}
 
+			addValueToBuffer(timeinfo, sensors[i], sensors[i].i_value.latest);
 			HAL.printf("%s buffered! -> %d %s\n",
 			           sensors[i].name.c_str(),
 			           sensors[i].i_value.latest,
 			           sensors[i].unit.c_str());
 
-			if (features.ambient_enable) {
-				if (tx_ambient->isTargetSensor(sensors[i].name)) {
-					tx_ambient->addValue(timeinfo,
-					                     sensors[i].i_value.latest,
-					                     sensors[i].name,
-					                     sensors[i].unit,
-					                     sensors[i].port);
-					tx_ambient->printIndex("Ambient:", "\n");
-				}
-			}
-
-			if (features.ftp_enable) {
-				tx_ftp->addValue(timeinfo,
-				                 sensors[i].i_value.latest,
-				                 sensors[i].name,
-				                 sensors[i].unit,
-				                 sensors[i].port);
-				tx_ftp->printIndex("FTP:", "\n");
-			}
-
-			if (features.http_enable) {
-				tx_http->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_http->printIndex("HTTP:", "\n");
-			}
-
-			if (features.mqtt_enable) {
-				tx_mqtt->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_mqtt->printIndex("MQTT:", "\n");
-			}
 		} else if (sensors[i].type == TYPE_PULSE_DELTA) {
 			if (txEventFlag.transmit == false) {
 				continue;
 			}
 
+			addValueToBuffer(timeinfo, sensors[i], sensors[i].i_value.latest);
 			HAL.printf("%s buffered! -> %d %s\n",
 			           sensors[i].name.c_str(),
 			           sensors[i].i_value.latest,
 			           sensors[i].unit.c_str());
-
-			if (features.ambient_enable) {
-				if (tx_ambient->isTargetSensor(sensors[i].name)) {
-					tx_ambient->addValue(timeinfo,
-					                     sensors[i].i_value.latest,
-					                     sensors[i].name,
-					                     sensors[i].unit,
-					                     sensors[i].port);
-					tx_ambient->printIndex("Ambient:", "\n");
-				}
-			}
-
-			if (features.ftp_enable) {
-				tx_ftp->addValue(timeinfo,
-				                 sensors[i].i_value.latest,
-				                 sensors[i].name,
-				                 sensors[i].unit,
-				                 sensors[i].port);
-				tx_ftp->printIndex("FTP:", "\n");
-			}
-
-			if (features.http_enable) {
-				tx_http->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_http->printIndex("HTTP:", "\n");
-			}
-
-			if (features.mqtt_enable) {
-				tx_mqtt->addValue(timeinfo,
-				                  sensors[i].i_value.latest,
-				                  sensors[i].name,
-				                  sensors[i].unit,
-				                  sensors[i].port);
-				tx_mqtt->printIndex("MQTT:", "\n");
-			}
 
 			// 比較基準の更新
 			sensors[i].i_value.prev = HAL.Gpio.getLastPulseCount(sensors[i].GPIO.pin);
 
 		} else if (sensors[i].type == TYPE_I2C) {
 			/* I2C sensor begin */
-			if (txEventFlag.on_change_transmit == true && txEventFlag.transmit == false) {
+			if (txEventFlag.on_change_transmit == true and txEventFlag.transmit == false) {
 				if (txEventFlag.link_i2c == false) {
 					continue;
 				}
 			}
 
 			if ((sensors[i].I2C.result & I2C_RES_INT) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].i_value.latest);
 				HAL.printf("%s buffered! (int)    -> %d %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].i_value.latest,
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].i_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].i_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].i_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].i_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 
 			if ((sensors[i].I2C.result & I2C_RES_DOUBLE) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].d_value.latest);
 				HAL.printf("%s buffered! (double) -> %f %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].d_value.latest,
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].d_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit,
-						                     sensors[i].port);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].d_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].d_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].d_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 
 			if ((sensors[i].I2C.result & I2C_RES_STRING) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].s_value.latest);
 				HAL.printf("%s buffered! (string) -> %s %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].s_value.latest.c_str(),
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].s_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit,
-						                     sensors[i].port);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].s_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].s_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].s_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 			/* I2C sensor end */
 		} else if (sensors[i].type == TYPE_MODBUS) {
 			/* Modbus sensor begin */
-			if (txEventFlag.on_change_transmit == true && txEventFlag.transmit == false) {
+			if (txEventFlag.on_change_transmit == true and txEventFlag.transmit == false) {
 				if (txEventFlag.link_modbus == false) {
 					continue;
 				}
 			}
 
 			if ((sensors[i].MODBUS.result & MODBUS_RES_INT) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].i_value.latest);
 				HAL.printf("%s buffered! (int)    -> %d %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].i_value.latest,
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].i_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit,
-						                     sensors[i].port);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].i_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].i_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].i_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 
 			if ((sensors[i].MODBUS.result & MODBUS_RES_DOUBLE) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].d_value.latest);
 				HAL.printf("%s buffered! (double) -> %f %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].d_value.latest,
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].d_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit,
-						                     sensors[i].port);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].d_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].d_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].d_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 
 			if ((sensors[i].MODBUS.result & MODBUS_RES_STRING) != 0) {
+				addValueToBuffer(timeinfo, sensors[i], sensors[i].s_value.latest);
 				HAL.printf("%s buffered! (string) -> %s %s\n",
 				           sensors[i].name.c_str(),
 				           sensors[i].s_value.latest.c_str(),
 				           sensors[i].unit.c_str());
-
-				if (features.ambient_enable) {
-					if (tx_ambient->isTargetSensor(sensors[i].name)) {
-						tx_ambient->addValue(timeinfo,
-						                     sensors[i].s_value.latest,
-						                     sensors[i].name,
-						                     sensors[i].unit,
-						                     sensors[i].port);
-						tx_ambient->printIndex("Ambient:", "\n");
-					}
-				}
-				if (features.ftp_enable) {
-					tx_ftp->addValue(timeinfo,
-					                 sensors[i].s_value.latest,
-					                 sensors[i].name,
-					                 sensors[i].unit,
-					                 sensors[i].port);
-					tx_ftp->printIndex("FTP:", "\n");
-				}
-
-				if (features.http_enable) {
-					tx_http->addValue(timeinfo,
-					                  sensors[i].s_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_http->printIndex("HTTP:", "\n");
-				}
-
-				if (features.mqtt_enable) {
-					tx_mqtt->addValue(timeinfo,
-					                  sensors[i].s_value.latest,
-					                  sensors[i].name,
-					                  sensors[i].unit,
-					                  sensors[i].port);
-					tx_mqtt->printIndex("MQTT:", "\n");
-				}
 			}
 			/* Modbus sensor end */
 		}
@@ -1127,21 +754,12 @@ void storeValue(struct tm timeinfo) {
 		sensors[i].value_changed = false;
 	} /* end of for */
 
-	if (!flag_updated) {
+	if (not flag_updated) {
 		return;
 	}
 
-	if (features.ambient_enable) {
-		updateDisplay(DisplayTiming::AMBIENT_BUFFER_UPDATE, tx_ambient->getPendingDataQuantity());
-	}
-	if (features.ftp_enable) {
-		updateDisplay(DisplayTiming::FTP_BUFFER_UPDATE, tx_ftp->getPendingDataQuantity());
-	}
-	if (features.http_enable) {
-		updateDisplay(DisplayTiming::HTTP_BUFFER_UPDATE, tx_http->getPendingDataQuantity());
-	}
-	if (features.mqtt_enable) {
-		updateDisplay(DisplayTiming::MQTT_BUFFER_UPDATE, tx_mqtt->getPendingDataQuantity());
+	for (auto &entry : transmitters) {
+		updateDisplay(entry.display_timing.buffer_update, entry.tx->getPendingDataQuantity());
 	}
 }
 
@@ -1153,7 +771,8 @@ void storeValue(struct tm timeinfo) {
 // ==================================================================
 void storeExceptionalValue(struct tm timeinfo) {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
-	if (!features.batch_send_enable && !features.camera_enable) {
+	if (not features.batch_send_enable and
+	    not features.camera_enable) {
 		return;
 	}
 
@@ -1241,38 +860,16 @@ void storeExceptionalValue(struct tm timeinfo) {
 			HAL.Camera.convert2jpg(); // 処理結果判定が必要かも
 			HAL.giveSemaphoreMutex("camera");
 
+			for (auto &entry : transmitters) {
+				entry.tx->addExceptionalValue(EX_STORAGE_NUMBER_0,
+				                              timeinfo,
+				                              sensors[i].name,
+				                              sensors[i].unit,
+				                              sensors[i].port);
+				entry.tx->printIndex();
+			}
+
 			HAL.printf("%s update!\n", sensors[i].name.c_str());
-
-			if (features.ambient_enable) {
-				HAL.printf("[Ambient] Camera data is NOT supported!\n");
-			}
-
-			if (features.http_enable) {
-				tx_http->addExceptionalValue(EX_STORAGE_NUMBER_0,
-				                             timeinfo,
-				                             sensors[i].name,
-				                             sensors[i].unit,
-				                             sensors[i].port);
-				tx_http->printIndex("HTTP:", "\n");
-			}
-
-			if (features.ftp_enable) {
-				tx_ftp->addExceptionalValue(EX_STORAGE_NUMBER_0,
-				                            timeinfo,
-				                            sensors[i].name,
-				                            sensors[i].unit,
-				                            sensors[i].port);
-				tx_ftp->printIndex("FTP:", "\n");
-			}
-
-			if (features.mqtt_enable) {
-				tx_mqtt->addExceptionalValue(EX_STORAGE_NUMBER_0,
-				                             timeinfo,
-				                             sensors[i].name,
-				                             sensors[i].unit,
-				                             sensors[i].port);
-				tx_mqtt->printIndex("MQTT:", "\n");
-			}
 			break;
 		}
 		default:
@@ -1282,36 +879,20 @@ void storeExceptionalValue(struct tm timeinfo) {
 
 	if (features.batch_send_enable) {
 		constexpr uint8_t EX_STORAGE_NUMBER_1 = 1;
-		if (features.ambient_enable) {
-			HAL.printf("[Ambient] Batch transfer is NOT supported!\n");
-		}
 
-		if (features.http_enable) {
-			tx_http->addExceptionalValue(EX_STORAGE_NUMBER_1,
-			                             timeinfo,
-			                             "Batch Transfer",
-			                             "",
-			                             0);
-			tx_http->printIndex("HTTP:", "\n");
-		}
-
-		if (features.ftp_enable) {
-			HAL.printf("[FTP] Batch transfer is NOT supported!\n");
-		}
-
-		if (features.mqtt_enable) {
-			tx_mqtt->addExceptionalValue(EX_STORAGE_NUMBER_1,
-			                             timeinfo,
-			                             "Batch Transfer",
-			                             "",
-			                             0);
-			tx_mqtt->printIndex("MQTT:", "\n");
+		for (auto &entry : transmitters) {
+			entry.tx->addExceptionalValue(EX_STORAGE_NUMBER_1,
+			                              timeinfo,
+			                              "Batch Transfer",
+			                              "",
+			                              0);
+			entry.tx->printIndex();
 		}
 
 		HAL.giveSemaphoreMutex("ex_sensor_data");
 	}
 
-	if (!flag_updated) {
+	if (not flag_updated) {
 		return;
 	}
 
@@ -1335,7 +916,7 @@ void toggleSelectedSensor() {
 	int selected_sensor_index = 0;
 
 	for (int i = 0; i < sensor_num; i++) {
-		if (_disp && sensors[i].enable) {
+		if (_disp and sensors[i].enable) {
 			sensors[i].display = true;
 			updateDisplay(DisplayTiming::SET_DISPLAY_SENSOR_NAME,
 			              sensors[i].name.c_str());
@@ -1352,7 +933,7 @@ void toggleSelectedSensor() {
 			_all_false         = false;
 		}
 	}
-	if (_disp == true || _all_false == true) {
+	if (_disp == true or _all_false == true) {
 		// 直前の表示が最後のセンサだった or Ready表示だった場合
 		for (int i = 0; i < sensor_num; i++) {
 			if (sensors[i].enable) {

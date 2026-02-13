@@ -14,6 +14,7 @@
 // #include <WiFiClientSecure.h>
 #include <WiFiType.h>
 #include <driver/pcnt.h>
+#include <esp_mac.h>
 #include <esp_task_wdt.h>
 #include <soc/pcnt_struct.h>
 
@@ -144,6 +145,7 @@ class HAL_GPIO_API : public IGpioControl {
 public:
 	std::vector<uint8_t> getPins() override;
 	String getModifier() override;
+	void setUnused(uint8_t pin) override;
 	bool initializePulseCounter(uint8_t pin, PULSE_EDGE edge) override;
 	bool stopPulseCounter(uint8_t pin) override;
 	bool startPulseCounter(uint8_t pin) override;
@@ -197,6 +199,8 @@ public:
 
 	void endSetup() override;
 	int8_t getBatteryLevel() override;
+	uint32_t getFreeHeapSize() override;
+	uint32_t getMinimumFreeHeapSize() override;
 	uint32_t getRandomNumber(uint32_t minimum = 0, uint32_t maximum = UINT32_MAX) override;
 	void periodicLoopTaskDebugMessage() override;
 	void printf(const char *fmt, ...) override;

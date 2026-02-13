@@ -46,7 +46,7 @@ public:
 	//! @param[in] (jpgImage) 送信画像データ
 	//! @return 送信成功の場合は true, 失敗の場合は false
 	// =============================================================
-	bool uploadImage(String dir, String file_name, std::vector<uint8_t> jpgImage);
+	bool uploadImage(String dir, String file_name, const std::vector<uint8_t> &jpgImage);
 
 	// ==============================================================
 	//! @brief ハートビートデータを送信します
@@ -55,6 +55,13 @@ public:
 	bool transmitHeartbeat() override;
 
 protected:
+	// ==============================================================
+	//! @brief addExceptionalValue の前処理（バッチ転送は非対応）
+	//! @param[in] (storage) ストレージ番号
+	//! @return 処理を続行する場合は true, 中断する場合は false
+	// =============================================================
+	bool preAddExceptionalValue(uint8_t storage) override;
+
 	// ==============================================================
 	//! @brief 送信処理を行います（通常のセンサデータ用）
 	//! @return 送信結果に応じたステータス変数（IoTTx_Tx_Result）
@@ -118,6 +125,8 @@ protected:
 	String _current_dir;
 	String _heartbeat_current_dir;
 	String _heartbeat_file_name;
+
+	PenaltyHelper _penalty_wait;
 };
 
 #endif

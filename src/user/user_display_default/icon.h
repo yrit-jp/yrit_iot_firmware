@@ -17,20 +17,20 @@ inline void fill_arc_helper(int32_t cx, int32_t cy, int32_t oradius_x, int32_t i
 
 	bool start180 = !(start < 180);
 	bool end180   = end < 180;
-	bool reversed = start + 180 < end || (end < start && start < end + 180);
+	bool reversed = start + 180 < end or (end < start and start < end + 180);
 
 	int32_t xleft  = -oradius_x;
 	int32_t xright = oradius_x + 1;
 	int32_t y      = -oradius_y;
 	int32_t ye     = oradius_y;
-	if (!reversed) {
-		if ((end >= 270 || end < 90) && (start >= 270 || start < 90))
+	if (not reversed) {
+		if ((end >= 270 or end < 90) and (start >= 270 or start < 90))
 			xleft = 0;
-		else if (end < 270 && end >= 90 && start < 270 && start >= 90)
+		else if (end < 270 and end >= 90 and start < 270 and start >= 90)
 			xright = 1;
-		if (end >= 180 && start >= 180)
+		if (end >= 180 and start >= 180)
 			ye = 0;
-		else if (end < 180 && start < 180)
+		else if (end < 180 and start < 180)
 			y = 0;
 	}
 	/*
@@ -41,21 +41,21 @@ inline void fill_arc_helper(int32_t cx, int32_t cy, int32_t oradius_x, int32_t i
 	if (xright > _clip_r - cx + 1) xright = _clip_r - cx + 1;
 	*/
 
-	bool trueCircle = (oradius_x == oradius_y) && (iradius_x == iradius_y);
+	bool trueCircle = (oradius_x == oradius_y) and (iradius_x == iradius_y);
 
 	int32_t iradius_y2 = iradius_y * (iradius_y - 1);
 	int32_t iradius_x2 = iradius_x * (iradius_x - 1);
-	float irad_rate    = iradius_x2 && iradius_y2 ? (float)iradius_x2 / (float)iradius_y2 : 0;
+	float irad_rate    = iradius_x2 and iradius_y2 ? (float)iradius_x2 / (float)iradius_y2 : 0;
 
 	int32_t oradius_y2 = oradius_y * (oradius_y + 1);
 	int32_t oradius_x2 = oradius_x * (oradius_x + 1);
-	float orad_rate    = oradius_x2 && oradius_y2 ? (float)oradius_x2 / (float)oradius_y2 : 0;
+	float orad_rate    = oradius_x2 and oradius_y2 ? (float)oradius_x2 / (float)oradius_y2 : 0;
 
 	do {
 		int32_t y2        = y * y;
 		int32_t compare_o = oradius_y2 - y2;
 		int32_t compare_i = iradius_y2 - y2;
-		if (!trueCircle) {
+		if (not trueCircle) {
 			compare_i = floorf(compare_i * irad_rate);
 			compare_o = ceilf(compare_o * orad_rate);
 		}
@@ -73,7 +73,7 @@ inline void fill_arc_helper(int32_t cx, int32_t cy, int32_t oradius_x, int32_t i
 			bool flg1  = start180 != (x <= ysslope);
 			bool flg2  = end180 != (x <= yeslope);
 			int32_t x2 = x * x;
-			if (x2 >= compare_i && ((flg1 && flg2) || (reversed && (flg1 || flg2))) && x != xe && x2 < compare_o) {
+			if (x2 >= compare_i and ((flg1 and flg2) or (reversed and (flg1 or flg2))) and x != xe and x2 < compare_o) {
 				++len;
 			} else {
 				if (len) {
@@ -82,7 +82,7 @@ inline void fill_arc_helper(int32_t cx, int32_t cy, int32_t oradius_x, int32_t i
 				}
 				if (x2 >= compare_o)
 					break;
-				if (x < 0 && x2 < compare_i) {
+				if (x < 0 and x2 < compare_i) {
 					x = -x;
 				}
 			}
@@ -107,7 +107,7 @@ inline void fillEllipseArc(int32_t x, int32_t y, int32_t r0x, int32_t r1x, int32
 		start += 360.0;
 	if (end < 0)
 		end += 360.0;
-	if (!equal && (fabsf(start - end) <= 0.0001)) {
+	if (not equal and (fabsf(start - end) <= 0.0001)) {
 		start = .0;
 		end   = 360.0;
 	}
@@ -191,9 +191,9 @@ inline void Icon_WiFiStatus(int x, int y, int rssi, uint16_t bgcolor = 0x3186) {
 	static bool clear_slash_line = false;
 	int span                     = 2;
 
-	if (rssi >= -100 && clear_slash_line) {
+	if (rssi >= -100 and clear_slash_line) {
 		for (int i = -2; i < 6; i++) {
-			if (i < 0 || 3 < i) {
+			if (i < 0 or 3 < i) {
 				HAL.Display.drawLine(x - 3 * span + i - 1, y - (7 * span) - 3, x - 3 * span + i + 11, y + 1, bgcolor);
 			} else {
 				HAL.Display.drawLine(x - 3 * span + i - 1, y - (7 * span) - 3, x - 3 * span + i + 11, y + 1, bgcolor);
@@ -208,7 +208,7 @@ inline void Icon_WiFiStatus(int x, int y, int rssi, uint16_t bgcolor = 0x3186) {
 
 	if (rssi < -100) {
 		for (int i = -2; i < 6; i++) {
-			if (i < 0 || 3 < i) {
+			if (i < 0 or 3 < i) {
 				HAL.Display.drawLine(x - 3 * span + i - 1, y - (7 * span) - 3, x - 3 * span + i + 11, y + 1, TFT_BLACK);
 			} else {
 				HAL.Display.drawLine(x - 3 * span + i - 1, y - (7 * span) - 3, x - 3 * span + i + 11, y + 1, TFT_RED);

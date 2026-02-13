@@ -5,6 +5,9 @@
 #endif
 
 void IoTTxMQTT::setMqttParam(String broker, uint16_t port, String base_topic, String broker_user, String broker_pass, bool retain) {
+	_mutex_key    = "iot_tx_mqtt";
+	_DEBUG_PREFIX = "MQTT";
+
 	if (broker.endsWith(".local")) {
 		// Resolve mDNS address
 		MyIPAddress ip;
@@ -14,9 +17,9 @@ void IoTTxMQTT::setMqttParam(String broker, uint16_t port, String base_topic, St
 			ip = HAL.Lan.resolveMDNS(broker);
 		}
 		if (ip.toString() == "0.0.0.0") {
-			debugMessage("MQTT", "Error", "Failed to resolve mDNS", "\n");
+			debugMessage(LogCategory::MQTT, LogLevel::Error, "Failed to resolve mDNS");
 		} else {
-			debugMessage("MQTT", "Success", ("mDNS Resolve: " + broker + " -> " + ip.toString()).c_str(), "\n");
+			debugMessage(LogCategory::MQTT, LogLevel::Info, ("mDNS Resolve: " + broker + " -> " + ip.toString()).c_str());
 		}
 		_broker = ip.toString();
 	} else {
@@ -42,25 +45,33 @@ void IoTTxMQTT::setMqttParam(String broker, uint16_t port, String base_topic, St
 	}
 
 	_client.setServer(_broker.c_str(), _port);
-	_client.setBufferSize(HAL_MQTT_MAX_PACKET_SIZE);
+	bool result = _client.setBufferSize(HAL_MQTT_MAX_PACKET_SIZE);
+	if (result == false) {
+		debugMessage(LogCategory::MQTT, LogLevel::Error, "Failed to set buffer.");
+	}
 }
 
 void IoTTxMQTT::clientLoop() {
-	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
-		if (_client.connected()) {
-			_client.loop();
-		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+	/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+	EthernetMutexGuard _;
+	if (_client.connected()) {
+		_client.loop();
 	}
+	/* -+-+-+-+- Mutex block END -+-+-+-+- */
+}
+
+IoTTx_Tx_Result IoTTxMQTT::update() {
+	clientLoop();
+	IoTTx_Tx_Result result = IoTTx::update();
+	clientLoop();
+	return result;
+}
+
+IoTTx_Tx_Result IoTTxMQTT::updateEx() {
+	clientLoop();
+	IoTTx_Tx_Result result = IoTTx::updateEx();
+	clientLoop();
+	return result;
 }
 
 bool IoTTxMQTT::connectBroker() {
@@ -69,52 +80,31 @@ bool IoTTxMQTT::connectBroker() {
 	String clientID   = HAL.getChipUUID();
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		is_connected = _client.connected();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (is_connected == false) {
-		debugMessage("MQTT", "Info", "Start try to connect Broker...", "\n");
+		debugMessage(LogCategory::MQTT, LogLevel::Info, "Start try to connect Broker...");
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
+		if (is_connected == false) {
+			_client.connect(clientID.c_str(), _broker_user.c_str(), _broker_pass.c_str());
+			result = _client.connected();
+		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	} else {
 		return true;
 	}
 
-	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
-		if (is_connected == false) {
-			_client.connect(clientID.c_str(), _broker_user.c_str(), _broker_pass.c_str());
-			if (_client.connected()) {
-				result = true;
-			} else {
-				result = false;
-			}
-		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
-	}
-
 	if (result == true) {
-		debugMessage("MQTT", "Info", "Broker connected!", "\n");
-		debugMessage("MQTT", "Info", ("ID: " + clientID).c_str(), "\n");
+		debugMessage(LogCategory::MQTT, LogLevel::Info, "Broker connected!");
+		debugMessage(LogCategory::MQTT, LogLevel::Info, ("ID: " + clientID).c_str());
 	} else {
-		debugMessage("MQTT", "Error", "Broker connection failed.", "\n");
-		debugMessage("MQTT", "Error", ("Status" + String(status())).c_str(), "\n");
+		debugMessage(LogCategory::MQTT, LogLevel::Error, "Broker connection failed.");
+		debugMessage(LogCategory::MQTT, LogLevel::Error, ("Status: " + String(status())).c_str());
 		_client.disconnect();
 	}
 
@@ -123,52 +113,32 @@ bool IoTTxMQTT::connectBroker() {
 
 int IoTTxMQTT::status() {
 	int state;
-
-	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
-		state = _client.state();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
-	}
-
+	/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+	EthernetMutexGuard _;
+	state = _client.state();
+	/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	return state;
 }
 
 bool IoTTxMQTT::transmitHeartbeat() {
-	static struct Penalty _penalty_wait = {false, 0, 0};
-
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return false;
 	}
 
-	if (!_heartbeat_store) {
+	if (not _heartbeat_store) {
 		return false;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return false;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return false;
 		}
 		break;
@@ -176,10 +146,8 @@ bool IoTTxMQTT::transmitHeartbeat() {
 		break;
 	}
 
-	if (!connectBroker()) {
-		_penalty_wait.enable             = true;     // Enable wait
-		_penalty_wait.last_failed_millis = millis(); // Update last failed time
-		_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+	if (not connectBroker()) {
+		_penalty_wait.activate(5000);
 		return false;
 	}
 
@@ -192,33 +160,28 @@ bool IoTTxMQTT::transmitHeartbeat() {
 	strftime(s_day, 64, "%Y/%m/%d %H:%M:%S", &_heartbeat_tm);
 	payload["day"] = s_day;
 
-	char buffer[128] = {'\0'};
+	payload["uptimeSec"]    = millis() / 1000;
+	payload["freeHeapByte"] = HAL.getFreeHeapSize();
+	payload["minHeapByte"]  = HAL.getMinimumFreeHeapSize();
+
+	char buffer[256] = {'\0'};
 	serializeJson(payload, buffer, sizeof(buffer));
 
 	constexpr bool RETAIN = true;
 	int success;
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		success = _client.publish(topic.c_str(), buffer, RETAIN);
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (success) {
 		// success to transmit
 		_heartbeat_store = false;
 	} else {
-		debugMessage("MQTT HB", "Warning", "Failed to write heartbeat", "\n");
-		_penalty_wait.enable             = true;     // Enable wait
-		_penalty_wait.last_failed_millis = millis(); // Update last failed time
-		_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+		debugMessage(LogCategory::MQTT_HB, LogLevel::Warning, "Failed to write heartbeat", "\n");
+		_penalty_wait.activate(1000);
 
 		clientLoop();
 		return false;
@@ -234,30 +197,22 @@ bool IoTTxMQTT::transmitHeartbeat() {
 }
 
 IoTTx_Tx_Result IoTTxMQTT::transmit() {
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
+	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
@@ -265,10 +220,8 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 		break;
 	}
 
-	if (!connectBroker()) {
-		_penalty_wait.enable             = true;     // Enable wait
-		_penalty_wait.last_failed_millis = millis(); // Update last failed time
-		_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+	if (not connectBroker()) {
+		_penalty_wait.activate(5000);
 		return result;
 	}
 
@@ -276,10 +229,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 	while (_tx_idx.store != _tx_idx.transmit) {
 		clientLoop();
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		JsonDocument payload;
 		payload["devID"]    = _devID;
@@ -305,66 +255,43 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 		}
 
 		if (_unix_time_field.enable) {
-			signed long long ts = mktime(&_buffer[_tx_idx.transmit].time);
-			_mutex              = false;
-			if (ts != -1) {
-				String s = lld2String(ts);
-				String p = _unix_time_field.nano_precision ? "000000000" : "";
-
-				// Translate String to signed long long
-				errno = 0;
-				ts    = strtoll((String(s) + p).c_str(), NULL, 10);
-				if (errno != ERANGE) {
-					payload["time"] = ts;
-				}
-			}
+			constexpr bool nano_precision = true;
+			payload["time"]               = convertToUnixTime(_buffer[_tx_idx.transmit].time, nano_precision);
 		}
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 
 		char buffer[256] = {'\0'};
 		serializeJson(payload, buffer, sizeof(buffer));
 
 		int success;
 		{
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-				HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-			}
-
+			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+			EthernetMutexGuard _;
 			success = _client.publish(topic.c_str(), buffer, _retain);
-
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				HAL.Lan.giveSemaphoreMutex();
-				/* -+-+-+-+- Mutex block END -+-+-+-+- */
-			}
+			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
 
 		if (success) {
 			// success to transmit
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex                          = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_buffer[_tx_idx.transmit].value = "";
 			_buffer[_tx_idx.transmit].name  = "";
 			_buffer[_tx_idx.transmit].unit  = "";
 
 			_tx_idx.transmit    = ((_tx_idx.transmit + 1) == IOTTX_BUFFER_SIZE) ? 0 : (_tx_idx.transmit + 1);
 			_pending_data_count = (((_pending_data_count - 1) > 0) ? (_pending_data_count - 1) : 0);
-			_mutex              = false;
-			result              = RESULT_TX_SOME_DATA;
-			// printIndex("MQTT:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 		} else {
-			debugMessage("MQTT", "Error", "Failed to publish.", "\n");
+			debugMessage(LogCategory::MQTT, LogLevel::Error, "Failed to publish.");
 			clientLoop();
 			if (_auto_disconnect) {
 				if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 					HAL.Wlan.disconnectWlan();
 				}
 			}
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+			_penalty_wait.activate(1000);
 			return result;
 		}
 	}
@@ -382,30 +309,22 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 
 IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
+	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
@@ -413,10 +332,8 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 		break;
 	}
 
-	if (!connectBroker()) {
-		_penalty_wait.enable             = true;     // Enable wait
-		_penalty_wait.last_failed_millis = millis(); // Update last failed time
-		_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+	if (not connectBroker()) {
+		_penalty_wait.activate(5000);
 		return result;
 	}
 
@@ -428,10 +345,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 			continue;
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		JsonDocument payload_ex;
 		payload_ex["devID"]    = _devID;
@@ -447,23 +361,40 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 			// For storage number 0
 			topic = "Camera/" + topic;
 
+			static char *tmp_arr       = nullptr;
+			static size_t tmp_arr_size = 0;
+
 			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			unsigned int len = base64::encodeLength(HAL.Camera.jpgImage.size());
-			char *tmp_arr    = new char[len + 1]();
+			HAL.giveSemaphoreMutex("camera");
 
+			if (tmp_arr_size < len + 1) {
+				delete[] tmp_arr;
+				tmp_arr = new char[len + 1]();
+				if (tmp_arr == nullptr) {
+					// メモリ確保に失敗した
+					debugMessage(LogCategory::MQTT_EX, LogLevel::Error,
+					             ("Failed alloc buffer. Size: " + String(len + 1)).c_str());
+					HAL.giveSemaphoreMutex(_mutex_key);
+					return result;
+				}
+				tmp_arr_size = len + 1;
+			}
+			memset(tmp_arr, 0, tmp_arr_size);
+
+			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			base64::encode(&HAL.Camera.jpgImage[0], HAL.Camera.jpgImage.size(), tmp_arr);
 			HAL.giveSemaphoreMutex("camera");
 
 			auto value = payload_ex["value"].to<JsonObject>();
 			if (copyArray(tmp_arr, value) == false) {
 				// failed to copy
-				debugMessage("MQTT Ex", "Error",
-				             ("Failed to copy image. Size: " + String(len)).c_str(), "\n");
-				_mutex = false;
+				debugMessage(LogCategory::MQTT_EX, LogLevel::Error,
+				             ("Failed to copy image. Size: " + String(len)).c_str());
+				HAL.giveSemaphoreMutex(_mutex_key);
 				return result;
 			}
 
-			delete[] tmp_arr;
 		} else if (storage == 1) {
 			// For storage number 1
 			topic = "Batch/" + topic;
@@ -475,61 +406,49 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 
 			HAL.giveSemaphoreMutex("ex_sensor_data");
 		} else {
-			_mutex = false;
-			break;
+			HAL.giveSemaphoreMutex(_mutex_key);
+			continue;
 		}
 
 		if (_unix_time_field.enable) {
-			signed long long ts = mktime(&_ex_buffer_info[storage].time);
-			_mutex              = false;
-			if (ts != -1) {
-				String s = lld2String(ts);
-				String p = _unix_time_field.nano_precision ? "000000000" : "";
+			constexpr bool nano_precision = true;
+			payload_ex["time"]            = convertToUnixTime(_ex_buffer_info[storage].time, nano_precision);
+		}
+		HAL.giveSemaphoreMutex(_mutex_key);
 
-				// Translate String to signed long long
-				errno = 0;
-				ts    = strtoll((String(s) + p).c_str(), NULL, 10);
-				if (errno != ERANGE) {
-					payload_ex["time"] = ts;
-				}
+		static char *buffer = nullptr;
+		if (buffer == nullptr) {
+			buffer = new char[HAL_MQTT_MAX_PACKET_SIZE]();
+			if (buffer == nullptr) {
+				// メモリ確保の初期化に失敗した
+				// 最初の１回だけ呼び出されるはずなので、再起動させエラーを知らせる
+				HAL.reboot();
 			}
 		}
-		_mutex = false;
-
-		char *buffer = new char[HAL_MQTT_MAX_PACKET_SIZE]();
+		memset(buffer, 0, HAL_MQTT_MAX_PACKET_SIZE);
 		serializeJson(payload_ex, buffer, HAL_MQTT_MAX_PACKET_SIZE);
 		// serializeJson(payload_ex, Serial);
 		// HAL.println("");
 
 		int success;
 		{
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-				HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-			}
-
+			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+			EthernetMutexGuard _;
 			success = _client.publish(topic.c_str(), buffer, _retain);
-
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				HAL.Lan.giveSemaphoreMutex();
-				/* -+-+-+-+- Mutex block END -+-+-+-+- */
-			}
+			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
 
-		delete[] buffer;
+		// delete[] buffer;
 		if (success) {
 			// success to transmit
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex                           = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_ex_buffer_info[storage].updated = false;
-			_mutex                           = false;
-			result                           = RESULT_TX_SOME_DATA;
-			// printIndex("MQTT:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 		} else {
-			debugMessage("MQTT Ex", "Error", "Failed to publish.", "\n");
-			debugMessage("MQTT Ex", "Info",
+			debugMessage(LogCategory::MQTT_EX, LogLevel::Error, "Failed to publish.");
+			debugMessage(LogCategory::MQTT_EX, LogLevel::Info,
 			             ("Bufsize: " + String(_client.getBufferSize())).c_str(), "\n");
 
 			clientLoop();
@@ -538,9 +457,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 					HAL.Wlan.disconnectWlan();
 				}
 			}
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+			_penalty_wait.activate(1000);
 			return result;
 		}
 	}

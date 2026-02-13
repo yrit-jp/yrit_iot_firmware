@@ -249,6 +249,8 @@ public:
 	void reboot();
 
 	int8_t getBatteryLevel() override;
+	uint32_t getFreeHeapSize() override;
+	uint32_t getMinimumFreeHeapSize() override;
 	uint32_t getRandomNumber(uint32_t minimum = 0,
 	                         uint32_t maximum = UINT32_MAX) override;
 	void printf(const char *fmt, ...) override;

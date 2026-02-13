@@ -1,6 +1,9 @@
 #include "iot_tx_ftp.h"
 
 void IoTTxFTP::setFtpParam(String server, String user, String pass, uint8_t _ftp_verbose) {
+	_mutex_key    = "iot_tx_ftp";
+	_DEBUG_PREFIX = "FTP";
+
 	if (server.endsWith(".local")) {
 		// Resolve mDNS address
 		MyIPAddress ip;
@@ -16,9 +19,9 @@ void IoTTxFTP::setFtpParam(String server, String user, String pass, uint8_t _ftp
 		}
 
 		if (ip.toString() == "0.0.0.0") {
-			debugMessage("FTP", "Error", "Failed to resolve mDNS", "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Error, "Failed to resolve mDNS");
 		} else {
-			debugMessage("FTP", "Success", ("mDNS Resolve: " + server + " -> " + ip.toString()).c_str(), "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Info, ("mDNS Resolve: " + server + " -> " + ip.toString()).c_str());
 		}
 		_ftp.setServerAddress(ip.toString());
 	} else {
@@ -59,300 +62,216 @@ bool IoTTxFTP::txFtp(String dir, String file_name, String value, bool create_new
 	bool result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.openConnection();
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("txFTP", "Warning", "Failed OpenConnection", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed OpenConnection");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.changeWorkDir(dir.c_str());
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("txFTP", "Warning", "Failed CWD", "\n");
-		debugMessage("txFTP", "Warning", dir.c_str(), "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed CWD");
+		debugMessage(LogCategory::FTP, LogLevel::Error, dir.c_str());
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.initFile("Type A");
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("txFTP", "Warning", "Failed Init Type", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed Init Type");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.clearBuffer();
 		if (create_new) {
 			// Create new file
 			_ftp.newFile(file_name.c_str());
-			if (!_ftp.isConnected()) {
+			if (not _ftp.isConnected()) {
 				_ftp.closeConnection();
 				result = false;
 			}
 		} else {
 			// Append to file
 			_ftp.appendFile((char *)file_name.c_str());
-			if (!_ftp.isConnected()) {
+			if (not _ftp.isConnected()) {
 				_ftp.closeConnection();
 				result = false;
 			}
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
 		if (create_new) {
-			debugMessage("txFTP", "Warning", "Failed New Create", "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Error, "Failed New Create");
 		} else {
-			debugMessage("txFTP", "Warning", "Failed APPE", "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Error, "Failed APPE");
 		}
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.write(value.c_str());
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("txFTP", "Warning", "Failed Write", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed Write");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.closeFile();
 		_ftp.closeConnection();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	return true;
 }
 
-bool IoTTxFTP::uploadImage(String dir, String file_name, std::vector<uint8_t> jpgImage) {
+bool IoTTxFTP::uploadImage(String dir, String file_name, const std::vector<uint8_t> &jpgImage) {
 	bool result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.openConnection();
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("uploadImage", "Warning", "Failed OpenConnection", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed OpenConnection");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.changeWorkDir(dir.c_str());
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("uploadImage", "Warning", "Failed CWD", "\n");
-		debugMessage("uploadImage", "Warning", dir.c_str(), "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed CWD");
+		debugMessage(LogCategory::FTP, LogLevel::Error, dir.c_str());
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.initFile("Type I");
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("uploadImage", "Warning", "Failed Init Type", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed Init Type");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.clearBuffer();
 		// Create new file
 		_ftp.newFile(file_name.c_str());
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("uploadImage", "Warning", "Failed New Create", "\n");
-		debugMessage("uploadImage", "Warning", dir.c_str(), "\n");
-		debugMessage("uploadImage", "Warning", file_name.c_str(), "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed New Create");
+		debugMessage(LogCategory::FTP, LogLevel::Error, dir.c_str());
+		debugMessage(LogCategory::FTP, LogLevel::Error, file_name.c_str());
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.writeData((uint8_t *)(&jpgImage[0]), jpgImage.size());
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("uploadImage", "Warning", "Failed Write", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed Write");
 		return false;
 	}
 	result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.closeFile();
 		_ftp.closeConnection();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	return true;
@@ -361,29 +280,40 @@ bool IoTTxFTP::uploadImage(String dir, String file_name, std::vector<uint8_t> jp
 /**********************************
  * Protected functions
  **********************************/
+bool IoTTxFTP::preAddExceptionalValue(uint8_t storage) {
+	constexpr uint8_t EX_STORAGE_NUMBER_0 = 0;
+	constexpr uint8_t EX_STORAGE_NUMBER_1 = 1;
+
+	switch (storage) {
+	case EX_STORAGE_NUMBER_0:
+		// カメラ画像
+		return true;
+	case EX_STORAGE_NUMBER_1:
+		// バッチ送信
+		debugMessage(LogCategory::FTP, LogLevel::Warning, "Batch transfer is NOT supported!");
+		return false;
+	default:
+		break;
+	}
+	return false;
+}
+
 bool IoTTxFTP::makeDirRecursive(String absolute_path) {
 	bool result = true;
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.openConnection();
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			_ftp.closeConnection();
 			result = false;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == false) {
-		debugMessage("FTP", "Warning", "Failed OpenConnection", "\n");
+		debugMessage(LogCategory::FTP, LogLevel::Error, "Failed OpenConnection");
 		return false;
 	}
 	result = true;
@@ -406,79 +336,59 @@ bool IoTTxFTP::makeDirRecursive(String absolute_path) {
 		// HAL.printf("d: %s\n", d.c_str());
 		uint16_t rc;
 		{
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-				HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-			}
-
+			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+			EthernetMutexGuard _;
 			_ftp.changeWorkDir(d.c_str());
 			rc = _ftp.getLastResponseCode();
-
-			if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-				HAL.Lan.giveSemaphoreMutex();
-				/* -+-+-+-+- Mutex block END -+-+-+-+- */
-			}
+			/* -+-+-+-+- Mutex block END -+-+-+-+- */
 		}
 
 		if (rc >= 400) {
 			String tmp = "Try to create directory: ";
 			tmp += exist_dir_path + d;
-			debugMessage("FTP", "Debug", tmp.c_str(), "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Debug, tmp.c_str());
 
 			{
-				if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-					/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-					HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-				}
+				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+				EthernetMutexGuard _;
 
 				// Re-open _ftp.connection
 				_ftp.openConnection();
 				_ftp.changeWorkDir(exist_dir_path.c_str());
 				_ftp.makeDir(d.c_str());
-				if (!_ftp.isConnected()) {
+				if (not _ftp.isConnected()) {
 					_ftp.closeConnection();
 					result = false;
 				}
-
-				if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-					HAL.Lan.giveSemaphoreMutex();
-					/* -+-+-+-+- Mutex block END -+-+-+-+- */
-				}
+				/* -+-+-+-+- Mutex block END -+-+-+-+- */
 			}
 
 			if (result == false) {
-				debugMessage("FTP", "Warning", "Failed MakeDir", "\n");
+				debugMessage(LogCategory::FTP, LogLevel::Error, "Failed MakeDir");
 				return false;
 			}
 			result = true;
 
 			{
-				if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-					/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-					HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-				}
-
+				/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+				EthernetMutexGuard _;
 				_ftp.changeWorkDir(d.c_str());
-				if (!_ftp.isConnected()) {
+				if (not _ftp.isConnected()) {
 					_ftp.closeConnection();
 					result = false;
 				}
-
-				if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-					HAL.Lan.giveSemaphoreMutex();
-					/* -+-+-+-+- Mutex block END -+-+-+-+- */
-				}
+				/* -+-+-+-+- Mutex block END -+-+-+-+- */
 			}
 
 			if (result == false) {
-				debugMessage("FTP", "Warning", "Failed ChangeWorkDir in loop", "\n");
+				debugMessage(LogCategory::FTP, LogLevel::Error, "Failed ChangeWorkDir in loop");
 				return false;
 			}
 			result = true;
 
 			tmp = "Success to create directory!: ";
 			tmp += exist_dir_path + d;
-			debugMessage("FTP", "Debug", tmp.c_str(), "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Debug, tmp.c_str(), "\n");
 		}
 
 		exist_dir_path += d + "/";
@@ -486,18 +396,11 @@ bool IoTTxFTP::makeDirRecursive(String absolute_path) {
 	}
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		// _ftp.closeFile();
 		_ftp.closeConnection();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 	return true;
 }
@@ -515,7 +418,7 @@ String IoTTxFTP::getFileName(String path) {
 }
 
 String IoTTxFTP::joinPath(String p1, String p2) {
-	if (!p1.endsWith("/") && !p2.startsWith("/")) {
+	if (not p1.endsWith("/") and not p2.startsWith("/")) {
 		p1.concat("/");
 	}
 	p1.concat(p2);
@@ -527,20 +430,13 @@ IoTTxFTP::FileExist IoTTxFTP::exist(String fpath) {
 	String ret                 = "";
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.openConnection();
-		if (!_ftp.isConnected()) {
+		if (not _ftp.isConnected()) {
 			result = FE_FTP_ERROR;
 		}
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 
 	if (result == FE_FTP_ERROR) {
@@ -548,15 +444,12 @@ IoTTxFTP::FileExist IoTTxFTP::exist(String fpath) {
 	}
 
 	{
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
-			HAL.Lan.takeSemaphoreMutex(portMAX_DELAY);
-		}
-
+		/* -+-+-+-+- Mutex block BEGIN -+-+-+-+- */
+		EthernetMutexGuard _;
 		_ftp.renameFile(fpath.c_str(), fpath.c_str());
 		uint16_t rc = _ftp.getLastResponseCode();
 
-		if (200 <= rc && rc < 300) {
+		if (200 <= rc and rc < 300) {
 			result = FE_EXIST;
 		} else if (rc == 503) {
 			result = FE_NOT_EXIST;
@@ -564,43 +457,30 @@ IoTTxFTP::FileExist IoTTxFTP::exist(String fpath) {
 			result = FE_FTP_ERROR;
 		}
 		_ftp.closeConnection();
-
-		if (HAL.getUseLinkLayer() == DATALINK_LAYER::ETHERNET) {
-			HAL.Lan.giveSemaphoreMutex();
-			/* -+-+-+-+- Mutex block END -+-+-+-+- */
-		}
+		/* -+-+-+-+- Mutex block END -+-+-+-+- */
 	}
 	return result;
 }
 
 bool IoTTxFTP::transmitHeartbeat() {
-	static struct Penalty _penalty_wait = {false, 0, 0};
-
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return false;
 	}
 
-	if (!_heartbeat_store) {
+	if (not _heartbeat_store) {
 		return false;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return false;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return false;
 		}
 		break;
@@ -608,9 +488,8 @@ bool IoTTxFTP::transmitHeartbeat() {
 		break;
 	}
 
-	if (!makeDirRecursive(_heartbeat_current_dir)) {
-		debugMessage("FTP HB", "Warning", "Failed to create directory -> ");
-		debugMessage("FTP HB", "Path", _heartbeat_current_dir.c_str(), "\n");
+	if (not makeDirRecursive(_heartbeat_current_dir)) {
+		debugMessage(LogCategory::FTP_HB, LogLevel::Error, ("Failed to create directory -> " + _heartbeat_current_dir).c_str());
 		// WiFi disconnect
 		// disconnectWiFi();
 		return false;
@@ -618,20 +497,22 @@ bool IoTTxFTP::transmitHeartbeat() {
 
 	char s_day[64] = {'\0'};
 	strftime(s_day, 64, "%Y/%m/%d %H:%M:%S", &_heartbeat_tm);
-	char buffer[256] = {'\0'};
-	int res          = snprintf(buffer, 256, "%s\n", s_day);
-	bool success     = false;
+	unsigned long uptime_sec = millis() / 1000;
+	uint32_t free_heap       = HAL.getFreeHeapSize();
+	uint32_t min_heap        = HAL.getMinimumFreeHeapSize();
+	char buffer[256]         = {'\0'};
+	int res                  = snprintf(buffer, 256, "day, uptimeSec, freeHeap, minHeap\n%s, %lu, %lu, %lu\n",
+	                                    s_day, uptime_sec, (unsigned long)free_heap, (unsigned long)min_heap);
+	bool success             = false;
 	if (res > 0) {
 		success = txFtp(_heartbeat_current_dir, _heartbeat_file_name, buffer, true);
 	}
 	if (success) {
 		_heartbeat_store = false;
 	} else {
-		debugMessage("FTP HB", "Warning", "Failed to write heartbeat", "\n");
+		debugMessage(LogCategory::FTP_HB, LogLevel::Error, "Failed to write heartbeat", "\n");
 		// disconnectWiFi();
-		_penalty_wait.enable             = true;     // Enable wait
-		_penalty_wait.last_failed_millis = millis(); // Update last failed time
-		_penalty_wait.wait_ms            = 1000;     // Wait interval time 1sec
+		_penalty_wait.activate(1000);
 		return false;
 	}
 
@@ -644,31 +525,23 @@ bool IoTTxFTP::transmitHeartbeat() {
 }
 
 IoTTx_Tx_Result IoTTxFTP::transmit() {
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	String prev_dir                     = "";
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
+	String prev_dir             = "";
+	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
@@ -677,50 +550,44 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 	}
 
 	while (_tx_idx.store != _tx_idx.transmit) {
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex           = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
+
 		char dirname[64] = {'\0'};
 		strftime(dirname, 64, "%Y%m%d", &_buffer[_tx_idx.transmit].time);
-		_mutex          = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
+
 		String save_dir = _current_dir + String(dirname);
 
-		if (!prev_dir.equals(save_dir)) {
+		if (not prev_dir.equals(save_dir)) {
 			// Create directory and csv header
-			if (!makeDirRecursive(save_dir)) {
-				debugMessage("FTP", "Warning", "Failed to create directory\n");
-				debugMessage("FTP", "Path", save_dir.c_str(), "\n");
+			if (not makeDirRecursive(save_dir)) {
+				debugMessage(LogCategory::FTP, LogLevel::Error, ("Failed to create directory: " + save_dir).c_str());
 				_failed_counter++;
-				_penalty_wait.enable             = true;     // Enable wait
-				_penalty_wait.last_failed_millis = millis(); // Update last failed time
 				if (_failed_counter >= 5) {
-					_failed_counter       = 0;
-					_penalty_wait.wait_ms = 5000; // Wait interval time 5sec
+					_failed_counter = 0;
+					_penalty_wait.activate(5000);
 				} else {
-					_penalty_wait.wait_ms = 1000; // Wait interval time 1sec
+					_penalty_wait.activate(1000);
 				}
 				return result;
 			}
 
 			IoTTxFTP::FileExist fe = exist(joinPath(save_dir, _file_name));
 			if (fe == FE_FTP_ERROR) {
-				debugMessage("FTP", "Warning", "Failed to check file exist", "\n");
+				debugMessage(LogCategory::FTP, LogLevel::Error, "Failed to check file exist", "\n");
 				_failed_counter++;
-				_penalty_wait.enable             = true;     // Enable wait
-				_penalty_wait.last_failed_millis = millis(); // Update last failed time
 				if (_failed_counter >= 5) {
-					_failed_counter       = 0;
-					_penalty_wait.wait_ms = 5000; // Wait interval time 5sec
+					_failed_counter = 0;
+					_penalty_wait.activate(5000);
 				} else {
-					_penalty_wait.wait_ms = 1000; // Wait interval time 1sec
+					_penalty_wait.activate(1000);
 				}
 				return result;
 			}
 			if (fe == FE_NOT_EXIST) {
 				_file_not_exist_count++;
 				if (_file_not_exist_count >= 3) {
-					debugMessage("FTP", "Info", "Create new file", "\n");
+					debugMessage(LogCategory::FTP, LogLevel::Info, "Create new file");
 					String header = "day, value, devID, sensName, unit\n";
 					if (_unix_time_field.enable) {
 						header = "time, " + header;
@@ -728,9 +595,7 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 					txFtp(save_dir, _file_name, header.c_str(), true);
 					_file_not_exist_count = 0;
 				} else {
-					_penalty_wait.enable             = true;     // Enable wait
-					_penalty_wait.last_failed_millis = millis(); // Update last failed time
-					_penalty_wait.wait_ms            = 500;      // Wait interval time 500msec
+					_penalty_wait.activate(500);
 					return result;
 				}
 			}
@@ -738,10 +603,7 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 			prev_dir              = String(save_dir);
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex         = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 		char s_day[64] = {'\0'};
 		strftime(s_day, 64, "%Y/%m/%d %H:%M:%S", &_buffer[_tx_idx.transmit].time);
 
@@ -751,14 +613,14 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 		String unix_time = "";
 		if (_unix_time_field.enable) {
 			signed long long ts = mktime(&_buffer[_tx_idx.transmit].time);
-			_mutex              = false;
+
 			if (ts != -1) {
 				String s  = lld2String(ts);
 				String p  = _unix_time_field.nano_precision ? "000000000" : "";
 				unix_time = s + p;
 			}
 		}
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 
 		char buffer[256] = {'\0'};
 		int res          = snprintf(buffer, 256, "%s, %s, %s, %s, %s, %s\n",
@@ -775,29 +637,24 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 			HAL.delay(1);
 		}
 		if (success) {
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex                          = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_buffer[_tx_idx.transmit].value = "";
 			_buffer[_tx_idx.transmit].name  = "";
 			_buffer[_tx_idx.transmit].unit  = "";
 
 			_tx_idx.transmit    = ((_tx_idx.transmit + 1) == IOTTX_BUFFER_SIZE) ? 0 : (_tx_idx.transmit + 1);
 			_pending_data_count = (((_pending_data_count - 1) > 0) ? (_pending_data_count - 1) : 0);
-			_mutex              = false;
-			result              = RESULT_TX_SOME_DATA;
-			// printIndex("FTP:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 		} else {
-			debugMessage("FTP", "Error", "Failed to write data", "\n");
+			debugMessage(LogCategory::FTP, LogLevel::Error, "Failed to write data");
 			_failed_counter++;
 			if (_failed_counter >= 5) {
 				_failed_counter = 0;
 			}
 
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 	}
@@ -815,31 +672,23 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 
 IoTTx_Tx_Result IoTTxFTP::transmitEx() {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
-	static struct Penalty _penalty_wait = {false, 0, 0};
-	String prev_dir                     = "";
-	enum IoTTx_Tx_Result result         = RESULT_TX_ERROR;
+	String prev_dir             = "";
+	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 
-	if (_penalty_wait.enable) {
-		if ((millis() - _penalty_wait.last_failed_millis) > _penalty_wait.wait_ms) {
-			_penalty_wait.enable = false;
-		}
+	if (_penalty_wait.isActive()) {
 		return result;
 	}
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (!HAL.Wlan.connectWlan()) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+		if (not HAL.Wlan.connectWlan()) {
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
 	case DATALINK_LAYER::ETHERNET:
 		if (HAL.Lan.isLinkUp() == false) {
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 		break;
@@ -853,13 +702,10 @@ IoTTx_Tx_Result IoTTxFTP::transmitEx() {
 			continue;
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex           = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 		char dirname[64] = {'\0'};
 		strftime(dirname, 64, "%Y%m%d", &_ex_buffer_info[storage].time);
-		_mutex          = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 		String save_dir = _current_dir;
 
 		if (storage == 0) {
@@ -867,58 +713,52 @@ IoTTx_Tx_Result IoTTxFTP::transmitEx() {
 			save_dir += "Camera/" + _devID + "/" + String(dirname);
 		}
 
-		if (!prev_dir.equals(save_dir)) {
+		if (not prev_dir.equals(save_dir)) {
 			// Create directory and csv header
-			if (!makeDirRecursive(save_dir)) {
-				debugMessage("FTP Ex", "Warning", "Failed to create directory\n");
-				debugMessage("FTP Ex", "Path", save_dir.c_str(), "\n");
+			if (not makeDirRecursive(save_dir)) {
+				debugMessage(LogCategory::FTP_EX, LogLevel::Error, ("Failed to create directory: " + save_dir).c_str());
 				_failed_counter++;
-				_penalty_wait.enable             = true;     // Enable wait
-				_penalty_wait.last_failed_millis = millis(); // Update last failed time
 				if (_failed_counter >= 5) {
-					_failed_counter       = 0;
-					_penalty_wait.wait_ms = 5000; // Wait interval time 5sec
+					_failed_counter = 0;
+					_penalty_wait.activate(5000);
 				} else {
-					_penalty_wait.wait_ms = 1000; // Wait interval time 1sec
+					_penalty_wait.activate(1000);
 				}
 				return result;
 			}
 			prev_dir = String(save_dir);
 		}
 
-		while (_mutex) {
-			HAL.delay(1);
-		}
-		_mutex = true;
+		HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 
 		bool success = false;
 		if (storage == 0) {
 			char fname[64] = {'\0'};
 			strftime(fname, 64, "%Y%m%d_%H%M%S.jpg", &_ex_buffer_info[storage].time);
-			_mutex  = false;
+
+			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			success = uploadImage(save_dir, fname, HAL.Camera.jpgImage);
+			HAL.giveSemaphoreMutex("camera");
+		} else {
+			HAL.giveSemaphoreMutex(_mutex_key);
+			continue;
 		}
-		_mutex = false;
+		HAL.giveSemaphoreMutex(_mutex_key);
 
 		if (success) {
-			while (_mutex) {
-				HAL.delay(1);
-			}
-			_mutex                           = true;
+			HAL.takeSemaphoreMutex(_mutex_key, portMAX_DELAY);
 			_ex_buffer_info[storage].updated = false;
-			_mutex                           = false;
-			result                           = RESULT_TX_SOME_DATA;
-			// printIndex("FTP:", "\n");
+			HAL.giveSemaphoreMutex(_mutex_key);
+			result = RESULT_TX_SOME_DATA;
+			// printIndex();
 		} else {
-			debugMessage("FTP Ex", "Error", "Failed to write data", "\n");
+			debugMessage(LogCategory::FTP_EX, LogLevel::Error, "Failed to write data");
 			_failed_counter++;
 			if (_failed_counter >= 5) {
 				_failed_counter = 0;
 			}
 
-			_penalty_wait.enable             = true;     // Enable wait
-			_penalty_wait.last_failed_millis = millis(); // Update last failed time
-			_penalty_wait.wait_ms            = 5000;     // Wait interval time 5sec
+			_penalty_wait.activate(5000);
 			return result;
 		}
 	}

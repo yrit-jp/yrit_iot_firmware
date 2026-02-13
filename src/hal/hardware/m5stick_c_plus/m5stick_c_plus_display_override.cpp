@@ -22,32 +22,52 @@ const uint16_t MY_DARKGRAY = 12678;
 volatile bool PlayLoadAnimation = false;
 TaskHandle_t LoadAnimationTask;
 void loadAnimationLoop(void *pvParameters) {
-	uint16_t left_x = 60; // Circle center X
-	uint16_t left_y = 70; // Circle center Y
-	int16_t i       = 0;  // Degree
-	int8_t up       = 2;  // Round speed
-	uint8_t cr      = 3;  // Sub circle radius
+	// Animation parameters
+	const uint16_t START_X = 60;
+	const uint16_t START_Y = 70;
+	const uint8_t ROTATION_SPEED = 2;
+	const uint8_t DOT_RADIUS = 3;
+	const uint8_t DOT_SPACING = 30;
+	const uint8_t NUM_DOTS = 5;
+	const uint8_t PHASE_ANGLE_STEP = 90 / NUM_DOTS;
+	const uint8_t BASE_DELAY = 15;
+	const uint8_t DELAY_VARIATION = 5;
+	const uint16_t MAX_ANGLE = 180;
+	const uint8_t COLOR_BASE = 10;
+	const uint8_t MAX_BRIGHTNESS = 255;
 
-	const uint8_t DOTS_SPACE_PX = 30;
-	const uint8_t DOTS          = 5;
-	const uint8_t PER_ANGLE     = 90 / DOTS;
-	uint16_t color[DOTS]        = {0};
+	int16_t angle_degrees = 0;
 
 	while (PlayLoadAnimation) {
-		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		for (int k = 0; k < DOTS; k++) {
-			uint8_t rgb = abs(sin(deg_to_rad(k * PER_ANGLE + i))) * 255;
-			color[k]    = HAL.Display.color565(10, rgb / 2, rgb);
-			HAL.Display.fillEllipse(left_x + k * DOTS_SPACE_PX, left_y, cr, cr, color[k]);
-			// cout << abs(sin(deg_to_rad(k * 45 + i))) << endl;
+		float angle_rad = deg_to_rad(angle_degrees);
+
+		// Pre-calculate brightness values for all dots
+		uint8_t brightness[NUM_DOTS];
+		uint16_t dot_colors[NUM_DOTS];
+		for (int k = 0; k < NUM_DOTS; k++) {
+			brightness[k] = abs(sin(deg_to_rad(k * PHASE_ANGLE_STEP + angle_degrees))) * MAX_BRIGHTNESS;
+			dot_colors[k] = HAL.Display.color565(COLOR_BASE, brightness[k] / 2, brightness[k]);
 		}
-		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
+
+		// Draw dots
+		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+		for (int k = 0; k < NUM_DOTS; k++) {
+			HAL.Display.fillEllipse(START_X + k * DOT_SPACING, START_Y, DOT_RADIUS, DOT_RADIUS, dot_colors[k]);
+		}
+		HAL.Display.giveSemaphoreMutex();
 
 		HAL.update();
-		HAL.delay(15 + 5 * (1 - sin(deg_to_rad(i))));
-		i = ((i - up) <= 0) ? 180 : (i - up);
+
+		// Variable delay for smooth animation
+		uint8_t delay_time = BASE_DELAY + DELAY_VARIATION * (1 - sin(angle_rad));
+		HAL.delay(delay_time);
+
+		// Update angle
+		angle_degrees = (angle_degrees <= ROTATION_SPEED) ? MAX_ANGLE : (angle_degrees - ROTATION_SPEED);
+
 		HAL.update();
 	}
+
 	LoadAnimationTask = NULL;
 	vTaskDelete(NULL);
 }
@@ -80,10 +100,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		uint8_t wait_sec = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
+		initMsgBox(CursorPosition::DUAL_LINE);
 		render->printf("起動モードの選択 （%d秒）\n", wait_sec);
 		render->setFontColor(TFT_YELLOW);
 		render->printf("← 設定モード");
@@ -100,10 +117,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 	case DisplayTiming::SS_MODE_ENTRY: {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
+		initMsgBox(CursorPosition::DUAL_LINE);
 		render->printf("設定を初期化しますか?\n");
 		render->printf("← No");
 		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
@@ -135,8 +149,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int hold_sec            = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
+		initMsgBox();
 		render->setFontSize(smrp.FONT_SIZE);
 		for (uint8_t c = hold_sec; c != 0; c--) {
 			render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
@@ -159,8 +172,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 			HAL.delay(1000);
 			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		}
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
+		initMsgBox();
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 
 		dt = DisplayTiming::IGNORE_DEFAULT_PROCESS;
@@ -171,10 +183,7 @@ enum DisplayTiming updateDisplayOverrideTop(std::unique_ptr<OpenFontRender> &ren
 		int sensor_num     = va_arg(ap, int);
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY); // Take mutex semaphore
-		HAL.Display.fillRect(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET,
-		                     smrp.DISPLAY_WIDTH, smrp.MSGBOX_HEIGHT + smrp.BOTTOM_OFFSET, TFT_BLACK);
-		render->setFontSize(smrp.FONT_SIZE);
-		render->setCursor(smrp.LEFT_OFFSET, smrp.DISPLAY_HEIGHT - smrp.MSGBOX_HEIGHT - smrp.BOTTOM_OFFSET);
+		initMsgBox(CursorPosition::DUAL_LINE);
 		render->setFontColor(TFT_GREENYELLOW);
 		render->printf("システムを起動する準備が\n完了しました!");
 		render->setFontColor(TFT_WHITE);
@@ -218,7 +227,7 @@ void updateDisplayOverrideBottom(std::unique_ptr<OpenFontRender> &render,
 
 		PlayLoadAnimation = true;
 		// SYSTEM_READY でタスクをDelete
-		const uint8_t TOP_PRIORITY    = 25; // 0 ~ 25
+		const uint8_t TOP_PRIORITY    = 24; // 0 ~ 24
 		const int STACK_SIZE          = 2048;
 		const uint8_t USE_CORE_NUMBER = 0;
 		xTaskCreatePinnedToCore(loadAnimationLoop,

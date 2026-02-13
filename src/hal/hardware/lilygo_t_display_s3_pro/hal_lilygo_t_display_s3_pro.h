@@ -16,6 +16,7 @@
 #include <WiFi.h>
 #include <WiFiType.h>
 #include <XPowersLib.h>
+#include <esp_mac.h>
 #include <esp_task_wdt.h>
 
 class HAL_Display_API : public TFT_eSPI {
@@ -123,6 +124,8 @@ public:
 
 	void endSetup() override;
 	int8_t getBatteryLevel() override;
+	uint32_t getFreeHeapSize() override;
+	uint32_t getMinimumFreeHeapSize() override;
 	uint32_t getRandomNumber(uint32_t minimum = 0, uint32_t maximum = UINT32_MAX) override;
 	void periodicLoopTaskDebugMessage() override;
 

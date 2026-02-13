@@ -102,9 +102,9 @@ uint8_t HAL_API::waitForButtonPressed(uint16_t wait_ms) {
 	unsigned long long ts = millis();
 
 	while ((millis() - ts) < wait_ms) {
-		if (!all_free_flag) {
+		if (not all_free_flag) {
 			HAL.update();
-			if (!BtnA.isPressed() && !BtnC.isPressed()) {
+			if ((not BtnA.isPressed()) and (not BtnC.isPressed())) {
 				all_free_flag = true;
 			}
 		} else {
@@ -175,11 +175,19 @@ String HAL_API::getChipUUID(bool include_prefix) {
 }
 
 int8_t HAL_API::getBatteryLevel() {
-	if (!IsBatteryConnected) {
+	if (not IsBatteryConnected) {
 		return -1;
 	}
 
 	return lipo.soc();
+}
+
+uint32_t HAL_API::getFreeHeapSize() {
+	return xPortGetFreeHeapSize();
+}
+
+uint32_t HAL_API::getMinimumFreeHeapSize() {
+	return xPortGetMinimumEverFreeHeapSize();
 }
 
 uint32_t HAL_API::getRandomNumber(uint32_t minimum, uint32_t maximum) {
@@ -541,7 +549,7 @@ bool HAL_WLAN_API::config(String ip, String gateway, String subnet, String dns1,
 	}
 
 	_use_dhcp = false;
-	if (_dns1.fromString(dns1) == false && _dns2.fromString(dns2) == false) {
+	if (_dns1.fromString(dns1) == false and _dns2.fromString(dns2) == false) {
 		// dns option mode
 		_set_dns = false;
 	}
@@ -557,10 +565,10 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 		return true;
 	}
 
-	if (!_ap_name.equals(ap_name)) {
+	if (not _ap_name.equals(ap_name)) {
 		_ap_name = ap_name;
 	}
-	if (!_pass.equals(pass)) {
+	if (not _pass.equals(pass)) {
 		_pass = pass;
 	}
 
@@ -569,7 +577,7 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 	wl_status_t result = WiFi.status();
 
 	unsigned long start = millis();
-	while (result != WL_CONNECTED && (millis() - start) < (timeout_ms)) {
+	while (result != WL_CONNECTED and (millis() - start) < (timeout_ms)) {
 		if (_pass.equals("")) {
 			result = WiFi.begin(_ap_name.c_str());
 		} else {
@@ -658,7 +666,7 @@ std::map<int, String> HAL_WLAN_API::scanAccessPoint(bool print_result) {
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 bool HAL_NTP_RTC_API::begin() {
-	if (!this->_rtc.begin()) {
+	if (not this->_rtc.begin()) {
 		HAL.println("RTC Error");
 		return false;
 	}
@@ -720,7 +728,7 @@ unsigned long HAL_NTP_RTC_API::getNTPtime() {
 		_udp.endPacket();
 		delay(2000);
 
-		if (!_udp.parsePacket()) {
+		if (not _udp.parsePacket()) {
 			// HAL.println("UDP Parse packet");
 			_udp.stop();
 			continue;
@@ -779,7 +787,7 @@ void HAL_NTP_RTC_API::makeNTPpacket() {
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
-	if (!fatfs.begin(&flash)) {
+	if (not fatfs.begin(&flash)) {
 		HAL.println("Err FATFS.");
 		return false;
 	}
@@ -808,7 +816,7 @@ bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
 }
 
 bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
-	if (!fatfs.begin(&flash)) {
+	if (not fatfs.begin(&flash)) {
 		HAL.println("Err FATFS.");
 		return false;
 	}
@@ -1088,7 +1096,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_TF_API::exist(String fpath) {
-// 	if (!_tf_available) {
+// 	if (not _tf_available) {
 // 		return false;
 // 	}
 // 	fpath = SD.getDriveLetter() + fpath;
@@ -1096,7 +1104,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_TF_API::makeDirRecursive(String absolute_path) {
-// 	if (!_tf_available) {
+// 	if (not _tf_available) {
 // 		return false;
 // 	}
 
@@ -1114,8 +1122,8 @@ void HAL_BLE_API::begin(String local_name) {
 // 			d = absolute_path.substring(1, sp);
 // 		}
 // 		exist_dir_path += "/" + d;
-// 		if (!SD.exists(exist_dir_path.c_str())) {
-// 			if (!SD.mkdir(exist_dir_path.c_str())) {
+// 		if (not SD.exists(exist_dir_path.c_str())) {
+// 			if (not SD.mkdir(exist_dir_path.c_str())) {
 // 				return false;
 // 			}
 // 		}
@@ -1126,13 +1134,13 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_TF_API::print(const char *fpath, const char *mode, const char *str) {
-// 	if (!_tf_available) {
+// 	if (not _tf_available) {
 // 		return false;
 // 	}
 
 // 	String filepath = SD.getDriveLetter() + String(fpath);
 // 	File f          = SD.open(filepath.c_str(), mode);
-// 	if (!f) {
+// 	if (not f) {
 // 		return false;
 // 	}
 // 	f.print(str);
@@ -1142,7 +1150,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_TF_API::printf(const char *fpath, const char *mode, const char *fmt, ...) {
-// 	if (!_tf_available) {
+// 	if (not _tf_available) {
 // 		return false;
 // 	}
 
@@ -1177,7 +1185,7 @@ void HAL_BLE_API::begin(String local_name) {
 // void HAL_DEBUG_LOG_API::buffering(const char *str) {
 // 	static bool insert_time_flag = true;
 
-// 	if (!_inited || !_logging) {
+// 	if (not (_inited and _logging)) {
 // 		return;
 // 	}
 
@@ -1215,15 +1223,15 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_DEBUG_LOG_API::begin() {
-// 	if (!HAL.Tf.ready()) {
-// 		if (!HAL.Tf.begin()) {
+// 	if (not HAL.Tf.ready()) {
+// 		if (not HAL.Tf.begin()) {
 // 			Serial1.println("    Failed to mount SD card");
 // 			return false;
 // 		}
 // 	}
 
-// 	if (!HAL.Tf.exist(_dpath)) {
-// 		if (!HAL.Tf.makeDirRecursive(_dpath)) {
+// 	if (not HAL.Tf.exist(_dpath)) {
+// 		if (not HAL.Tf.makeDirRecursive(_dpath)) {
 // 			Serial1.println("    Failed to create directory");
 // 			return false;
 // 		}
@@ -1261,15 +1269,15 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_DEBUG_LOG_API::print(const char *str) {
-// 	if (!_inited || !_logging) {
+// 	if (not (_inited and _logging)) {
 // 		return false;
 // 	}
 
 // 	buffering(str);
 
 // 	String log_fpath = HAL.Tf.joinPath(_dpath, _fname + String(_fnumber) + _fext);
-// 	if (!HAL.Tf.exist(_dpath)) {
-// 		if (!HAL.Tf.makeDirRecursive(_dpath)) {
+// 	if (not HAL.Tf.exist(_dpath)) {
+// 		if (not HAL.Tf.makeDirRecursive(_dpath)) {
 // 			return false;
 // 		}
 // 	}
@@ -1283,7 +1291,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // bool HAL_DEBUG_LOG_API::printf(const char *fmt, ...) {
-// 	if (!_inited || !_logging) {
+// 	if (not (_inited and _logging)) {
 // 		return false;
 // 	}
 
@@ -1298,7 +1306,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // void HAL_DEBUG_LOG_API::flush() {
-// 	if (!_inited || !_logging) {
+// 	if (not (_inited and _logging)) {
 // 		return;
 // 	}
 
@@ -1307,8 +1315,8 @@ void HAL_BLE_API::begin(String local_name) {
 // 	}
 
 // 	String log_fpath = HAL.Tf.joinPath(_dpath, _fname + String(_fnumber) + _fext);
-// 	if (!HAL.Tf.exist(_dpath)) {
-// 		if (!HAL.Tf.makeDirRecursive(_dpath)) {
+// 	if (not HAL.Tf.exist(_dpath)) {
+// 		if (not HAL.Tf.makeDirRecursive(_dpath)) {
 // 			return;
 // 		}
 // 	}
@@ -1320,7 +1328,7 @@ void HAL_BLE_API::begin(String local_name) {
 // }
 
 // void HAL_DEBUG_LOG_API::loggingStart() {
-// 	if (!_inited) {
+// 	if (not _inited) {
 // 		_logging = false;
 // 	}
 

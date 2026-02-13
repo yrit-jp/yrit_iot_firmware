@@ -28,7 +28,7 @@ MODBUS_INIT_RESULT initializeUserModbusDevice(uint8_t port, uint8_t id) {
 
 	/* ここに新規センサの初期化処理を追加する（ここから）*/
 
-	if (!modbus_user_sensors[port][id].xy_md02) {
+	if (not modbus_user_sensors[port][id].xy_md02) {
 		// unique_ptr を初期化する
 		modbus_user_sensors[port][id].xy_md02.reset(new XY_MD02(_serial));
 

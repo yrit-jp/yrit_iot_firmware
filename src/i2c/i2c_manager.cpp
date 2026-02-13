@@ -133,7 +133,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 
 	switch (_address) {
 	case 0x09:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].dt_s1) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].dt_s1) {
 			// flexible thermistor
 			i2c_sensors[port][address][bus_channel][sub_address].dt_s1.reset(new DT_S1(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].dt_s1->begin(_address)) {
@@ -149,12 +149,12 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		break;
 	case 0x18:
 		// DS248X: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
 			// DS248X を初期化
 			i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset(new DS248X(_wire, _address));
 
 			// DS18XXX センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset(
 				    new OW_DS18XXX<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
@@ -191,7 +191,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 
 			// MAX3185 センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset(
 				    new OW_MAX3185<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
@@ -244,12 +244,12 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 	case 0x1A:
 	case 0x1B:
 		// DS248X: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
 			// DS248X を初期化
 			i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset(new DS248X(_wire, _address));
 
 			// DS18XXX センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset(
 				    new OW_DS18XXX<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
@@ -286,7 +286,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 
 			// MAX3185 センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset(
 				    new OW_MAX3185<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
@@ -338,7 +338,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 	case 0x20:
 	case 0x21:
 	case 0x22:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
 			i2c_sensors[port][address][bus_channel][sub_address].pca9554.reset(new PCA9554(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].pca9554->begin() == true) {
@@ -353,7 +353,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
 			i2c_sensors[port][address][bus_channel][sub_address].mcp23017.reset(new MCP23017(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017->init(_address)) {
@@ -368,7 +368,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x23:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ltr_553als) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ltr_553als) {
 			// LTR-553ALS
 			i2c_sensors[port][address][bus_channel][sub_address].ltr_553als.reset(new LTR_553ALS(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].ltr_553als->begin(_address) == true) {
@@ -382,7 +382,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
 			i2c_sensors[port][address][bus_channel][sub_address].pca9554.reset(new PCA9554(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].pca9554->begin() == true) {
@@ -397,14 +397,14 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
 			i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi.reset(new BH1750(_address));
 			// 判定方法が無いため、決め打ち
 			i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi->begin(BH1750::CONTINUOUS_HIGH_RES_MODE);
 			return I2C_1_DATA_DEVICE;
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
 			i2c_sensors[port][address][bus_channel][sub_address].mcp23017.reset(new MCP23017(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017->init(_address)) {
@@ -420,7 +420,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		break;
 	case 0x24:
 	case 0x25:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
 			i2c_sensors[port][address][bus_channel][sub_address].pca9554.reset(new PCA9554(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].pca9554->begin() == true) {
@@ -435,7 +435,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
 			i2c_sensors[port][address][bus_channel][sub_address].mcp23017.reset(new MCP23017(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017->init(_address)) {
@@ -450,7 +450,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x26:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_weight) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_weight) {
 			// M5 Weight I2C Unit
 			i2c_sensors[port][address][bus_channel][sub_address].m5_weight.reset(new M5UnitWeightI2C());
 			if (i2c_sensors[port][address][bus_channel][sub_address].m5_weight->begin(_wire, _sda, _scl) == true) {
@@ -480,7 +480,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
 			i2c_sensors[port][address][bus_channel][sub_address].pca9554.reset(new PCA9554(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].pca9554->begin() == true) {
@@ -495,7 +495,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
 			i2c_sensors[port][address][bus_channel][sub_address].mcp23017.reset(new MCP23017(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017->init(_address)) {
@@ -510,7 +510,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x27:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
 			i2c_sensors[port][address][bus_channel][sub_address].pca9554.reset(new PCA9554(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].pca9554->begin() == true) {
@@ -525,7 +525,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
 			i2c_sensors[port][address][bus_channel][sub_address].mcp23017.reset(new MCP23017(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017->init(_address)) {
@@ -540,12 +540,12 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x28:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mfrc522) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mfrc522) {
 			i2c_sensors[port][address][bus_channel][sub_address].mfrc522.reset(new MFRC522(_address, _wire));
 			i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PCD_Init();
 			auto versionReg = i2c_sensors[port][address][bus_channel][sub_address].mfrc522->VersionReg;
 			uint8_t v       = i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PCD_ReadRegister(versionReg);
-			if ((v == 0x00) || (v == 0xFF)) {
+			if ((v == 0x00) or (v == 0xFF)) {
 				i2c_sensors[port][address][bus_channel][sub_address].mfrc522.reset();
 				// 安定化のため Wire をリセットする
 				_wire->end();
@@ -558,7 +558,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x29:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].vl53l0x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].vl53l0x) {
 			// ToF Unit
 			i2c_sensors[port][address][bus_channel][sub_address].vl53l0x.reset(new VL53L0X());
 			i2c_sensors[port][address][bus_channel][sub_address].vl53l0x->setBus(_wire);
@@ -575,7 +575,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
 			// ToF Unit
 			i2c_sensors[port][address][bus_channel][sub_address].vl53l1x.reset(new VL53L1X());
 			i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->setBus(_wire);
@@ -594,7 +594,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
 			// Color Unit
 			i2c_sensors[port][address][bus_channel][sub_address].tcs34725.reset(new Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X));
 			if (i2c_sensors[port][address][bus_channel][sub_address].tcs34725->begin(_address, _wire)) {
@@ -610,7 +610,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
 			// Digital Light Sensor
 			i2c_sensors[port][address][bus_channel][sub_address].tsl2561.reset(new TSL2561(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561->begin(_address)) {
@@ -625,7 +625,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x38:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ahtxx) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ahtxx) {
 			// AHT10, AHT20
 			i2c_sensors[port][address][bus_channel][sub_address].ahtxx.reset(new DFRobot_AHT20(*_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].ahtxx->begin() == 0) {
@@ -640,7 +640,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x39:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
 			// Digital Light Sensor
 			i2c_sensors[port][address][bus_channel][sub_address].tsl2561.reset(new TSL2561(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561->begin(_address)) {
@@ -656,14 +656,14 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		break;
 	case 0x40:
 		// DS2485: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
 			// DS2485 を初期化
 			i2c_sensors[port][address][bus_channel][sub_address].ds2485.reset(new DS2485(_wire, _address));
 			i2c_sensors[port][address][bus_channel][sub_address].ds2485->deviceReset();
 			i2c_sensors[port][address][bus_channel][sub_address].ds2485->setRPUP();
 
 			// DS18XXX センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485.reset(
 				    new OW_DS18XXX<DS2485>(i2c_sensors[port][address][bus_channel][sub_address].ds2485.get()));
 
@@ -700,7 +700,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 
 			// MAX3185 センサーの初期化
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
 				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485.reset(
 				    new OW_MAX3185<DS2485>(i2c_sensors[port][address][bus_channel][sub_address].ds2485.get()));
 
@@ -749,7 +749,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sns2) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sns2) {
 			// ATMICL-ONE
 			i2c_sensors[port][address][bus_channel][sub_address].sns2.reset(new ATMICL_ONE(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].sns2->begin(_address)) {
@@ -764,7 +764,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x44:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
 			// SHT4X -- Digital temperature / humidity sensor
 			i2c_sensors[port][address][bus_channel][sub_address].sht4x.reset(new SensirionI2cSht4x());
 			i2c_sensors[port][address][bus_channel][sub_address].sht4x->begin(*_wire, _address);
@@ -782,7 +782,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
 			// SHT3X -- Digital temperature / humidity sensor
 			i2c_sensors[port][address][bus_channel][sub_address].sht3x.reset(new Adafruit_SHT31(_wire));
 
@@ -832,7 +832,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x45:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_extio2) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_extio2) {
 			// M5 ExtI/O 2
 			i2c_sensors[port][address][bus_channel][sub_address].m5_extio2.reset(new M5_EXTIO2());
 			if (i2c_sensors[port][address][bus_channel][sub_address].m5_extio2->begin(_wire)) {
@@ -854,7 +854,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
 			// SHT4X -- Digital temperature / humidity sensor
 			i2c_sensors[port][address][bus_channel][sub_address].sht4x.reset(new SensirionI2cSht4x());
 			i2c_sensors[port][address][bus_channel][sub_address].sht4x->begin(*_wire, _address);
@@ -872,7 +872,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
 			// SHT3X -- Digital temperature / humidity sensor
 			i2c_sensors[port][address][bus_channel][sub_address].sht3x.reset(new Adafruit_SHT31(_wire));
 
@@ -922,7 +922,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x48:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115.reset(new DFRobot_ADS1115(_wire));
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115->setAddr_ADS1115(_address);
@@ -935,7 +935,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115->setMux(eADSMUX_8);
 			uint8_t mux2 = i2c_sensors[port][address][bus_channel][sub_address].ads1115->getMux();
 
-			if (mux1 == 4 && mux2 == 7) {
+			if (mux1 == 4 and mux2 == 7) {
 				// Target is ADS1115 OK
 				i2c_sensors[port][address][bus_channel][sub_address].ads1115->setGain(eGAIN_TWOTHIRDS);  // 2/3x gain
 				i2c_sensors[port][address][bus_channel][sub_address].ads1115->setMode(eMODE_SINGLE);     // single-shot mode
@@ -951,7 +951,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ads1100) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ads1100) {
 			// ADC Unit
 			i2c_sensors[port][address][bus_channel][sub_address].ads1100.reset(new ADS1100(_wire));
 			i2c_sensors[port][address][bus_channel][sub_address].ads1100->getAddr_ADS1100(ADS1100_DEFAULT_ADDRESS); // 0x48, 1001 000 (ADDR = GND)
@@ -987,7 +987,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x49:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
 			// Digital Light Sensor
 			i2c_sensors[port][address][bus_channel][sub_address].tsl2561.reset(new TSL2561(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561->begin(_address)) {
@@ -1001,7 +1001,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115.reset(new DFRobot_ADS1115(_wire));
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115->setAddr_ADS1115(_address);
@@ -1014,7 +1014,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			i2c_sensors[port][address][bus_channel][sub_address].ads1115->setMux(eADSMUX_8);
 			uint8_t mux2 = i2c_sensors[port][address][bus_channel][sub_address].ads1115->getMux();
 
-			if (mux1 == 4 && mux2 == 7) {
+			if (mux1 == 4 and mux2 == 7) {
 				// Target is ADS1115 OK
 				i2c_sensors[port][address][bus_channel][sub_address].ads1115->setGain(eGAIN_TWOTHIRDS);  // 2/3x gain
 				i2c_sensors[port][address][bus_channel][sub_address].ads1115->setMode(eMODE_SINGLE);     // single-shot mode
@@ -1031,7 +1031,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x4D:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx) {
 			// SC16IS7XX I2C-UART for A02YYUW, IP67 Ultrasonic distance sensor (A1-Vss, A0-Vss)
 			i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx.reset(new SC16IS7XX(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx->begin(_address)) {
@@ -1047,7 +1047,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x50:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ands) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ands) {
 			// ATMICL-ONE
 			i2c_sensors[port][address][bus_channel][sub_address].ands.reset(new ATMICL_ONE(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].ands->begin(_address)) {
@@ -1062,7 +1062,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x51:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
 			// M5 Ampere meter unit
 			uint8_t root_address = (address == 0x51) ? 0x48 : address; // 0x51 以外の時はマルチプレクサ経由
 			if (i2c_sensors[port][root_address][bus_channel][0x48].ads1115) {
@@ -1079,7 +1079,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x53:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
 			// M5 Volt meter unit
 			uint8_t root_address = (address == 0x53) ? 0x49 : address; // 0x53 以外の時はマルチプレクサ経由
 			if (i2c_sensors[port][root_address][bus_channel][0x49].ads1115) {
@@ -1102,7 +1102,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x55:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_4_20mA_unit) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_4_20mA_unit) {
 			// M5 4-20mA Unit
 			i2c_sensors[port][address][bus_channel][sub_address].m5_4_20mA_unit.reset(new MODULE_4_20MA());
 			i2c_sensors[port][address][bus_channel][sub_address].m5_4_20mA_unit->begin(_wire, _address); // 100k
@@ -1118,7 +1118,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x56:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
 			// QMP6988 -- atmospheric pressure
 			i2c_sensors[port][address][bus_channel][sub_address].qmp6988.reset(new QMP6988());
 			if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988->init(_address, _wire)) {
@@ -1133,7 +1133,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x57:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].rcwl9620) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].rcwl9620) {
 			// RCWL-9620 -- ultra sonic distance sensor
 			i2c_sensors[port][address][bus_channel][sub_address].rcwl9620.reset(new RCWL9620(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].rcwl9620->begin(_address)) {
@@ -1148,7 +1148,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x58:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sgp30) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sgp30) {
 			// SGP30
 			i2c_sensors[port][address][bus_channel][sub_address].sgp30.reset(new Adafruit_SGP30());
 			if (i2c_sensors[port][address][bus_channel][sub_address].sgp30->begin(_wire)) {
@@ -1162,7 +1162,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].an16) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].an16) {
 			// ATMICL-ONE
 			i2c_sensors[port][address][bus_channel][sub_address].an16.reset(new ATMICL_ONE(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].an16->begin(_address)) {
@@ -1177,7 +1177,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x5C:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
 			i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi.reset(new BH1750());
 			// 判定方法が無いため、決め打ち
 			i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi->begin(BH1750::CONTINUOUS_HIGH_RES_MODE, _address, _wire);
@@ -1185,7 +1185,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x60:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].mcp9600) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].mcp9600) {
 			// MCP9600
 			i2c_sensors[port][address][bus_channel][sub_address].mcp9600.reset(new MCP9600(_wire, _address));
 			// K 型熱電対を想定する
@@ -1216,7 +1216,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x61:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].scd30) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].scd30) {
 			// SCD30
 			i2c_sensors[port][address][bus_channel][sub_address].scd30.reset(new SCD30());
 			if (i2c_sensors[port][address][bus_channel][sub_address].scd30->begin(*_wire)) {
@@ -1231,7 +1231,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ezo_do) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].ezo_do) {
 			// EZO_DO
 			i2c_sensors[port][address][bus_channel][sub_address].ezo_do.reset(new EZO_DO(_address, _wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].ezo_do->begin()) {
@@ -1246,7 +1246,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x62:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].scd4x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].scd4x) {
 			// SCD4x
 			i2c_sensors[port][address][bus_channel][sub_address].scd4x.reset(new SCD4x());
 			if (i2c_sensors[port][address][bus_channel][sub_address].scd4x->begin(*_wire)) {
@@ -1261,13 +1261,13 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x66:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter) {
 			// M5 KMeter
 			i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter.reset(new M5_KMeter());
 			i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->begin(_wire, _address);
 			bool result                          = i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->update();
 			M5_KMeter::error_code_t latest_error = i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->getError();
-			if (result || latest_error == M5_KMeter::err_open_circuit) {
+			if (result or latest_error == M5_KMeter::err_open_circuit) {
 				return I2C_2_DATA_DEVICE;
 			} else {
 				i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter.reset();
@@ -1278,7 +1278,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso) {
 			// M5 KMeter Isolation
 			i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso.reset(new UNIT_KMETER());
 			if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso->begin(_wire, _address)) {
@@ -1296,7 +1296,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x69:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].sen54) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].sen54) {
 			// Sensirion SEN54
 			uint16_t err;
 			uint8_t pName[32] = {0};
@@ -1304,21 +1304,21 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			i2c_sensors[port][address][bus_channel][sub_address].sen54->begin(*_wire);
 			err = i2c_sensors[port][address][bus_channel][sub_address].sen54->deviceReset();
 
-			if (!err) {
+			if (not err) {
 				err = i2c_sensors[port][address][bus_channel][sub_address].sen54->getProductName(pName, 32);
 			}
-			if (!err) {
+			if (not err) {
 				err = strcmp((char *)pName, "SEN54");
 			}
 
-			if (!err) {
+			if (not err) {
 				err = i2c_sensors[port][address][bus_channel][sub_address].sen54->setTemperatureOffsetSimple(0.0);
 			}
-			if (!err) {
+			if (not err) {
 				err = i2c_sensors[port][address][bus_channel][sub_address].sen54->startMeasurement();
 			}
 
-			if (!err) {
+			if (not err) {
 				return I2C_7_DATA_DEVICE;
 			} else {
 				i2c_sensors[port][address][bus_channel][sub_address].sen54.reset();
@@ -1330,7 +1330,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x70:
-		if (bus_channel == -1 && !i2c_sensors[port][_address][-1][_address].tca9548a) {
+		if (bus_channel == -1 and not i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// 初期化
 			i2c_sensors[port][_address][-1][_address].tca9548a.reset(new QWIICMUX());
 			// チャンネルスキャン
@@ -1364,7 +1364,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				_wire->begin();
 				// map のリセットも必要？
 			}
-		} else if (bus_channel != -1 && i2c_sensors[port][_address][-1][_address].tca9548a) {
+		} else if (bus_channel != -1 and i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// マルチプレクサの下についているデバイス
 			i2c_sensors[port][_address][-1][_address].tca9548a->setPort(bus_channel);
 			I2C_INIT_RESULT result = initializeDevice(port, _address, bus_channel, sub_address, true);
@@ -1373,7 +1373,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			return result;
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
 			// QMP6988 -- atmospheric pressure
 			i2c_sensors[port][address][bus_channel][sub_address].qmp6988.reset(new QMP6988());
 			if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988->init(_address, _wire)) {
@@ -1393,7 +1393,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 	case 0x73:
 	case 0x74:
 	case 0x75:
-		if (bus_channel == -1 && !i2c_sensors[port][_address][-1][_address].tca9548a) {
+		if (bus_channel == -1 and not i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// 初期化
 			i2c_sensors[port][_address][-1][_address].tca9548a.reset(new QWIICMUX());
 			// チャンネルスキャン
@@ -1427,7 +1427,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				_wire->begin();
 				// map のリセットも必要？
 			}
-		} else if (bus_channel != -1 && i2c_sensors[port][_address][-1][_address].tca9548a) {
+		} else if (bus_channel != -1 and i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// マルチプレクサの下についているデバイス
 			i2c_sensors[port][_address][-1][_address].tca9548a->setPort(bus_channel);
 			I2C_INIT_RESULT result = initializeDevice(port, _address, bus_channel, sub_address, true);
@@ -1438,7 +1438,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 
 		break;
 	case 0x76:
-		if (bus_channel == -1 && !i2c_sensors[port][_address][-1][_address].tca9548a) {
+		if (bus_channel == -1 and not i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// 初期化
 			i2c_sensors[port][_address][-1][_address].tca9548a.reset(new QWIICMUX());
 			// チャンネルスキャン
@@ -1472,7 +1472,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				_wire->begin();
 				// map のリセットも必要？
 			}
-		} else if (bus_channel != -1 && i2c_sensors[port][_address][-1][_address].tca9548a) {
+		} else if (bus_channel != -1 and i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// マルチプレクサの下についているデバイス
 			i2c_sensors[port][_address][-1][_address].tca9548a->setPort(bus_channel);
 			I2C_INIT_RESULT result = initializeDevice(port, _address, bus_channel, sub_address, true);
@@ -1481,12 +1481,12 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			return result;
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
 			// BMP280 -- Digital Barometer
 			i2c_sensors[port][address][bus_channel][sub_address].bmp280.reset(new Bme280TwoWire());
 			if (i2c_sensors[port][address][bus_channel][sub_address].bmp280->begin(static_cast<Bme280TwoWireAddress>(_address), _wire) == true) {
 				uint8_t chip_id = i2c_sensors[port][address][bus_channel][sub_address].bmp280->getChipId();
-				if (chip_id == 0x56 || chip_id == 0x57 || chip_id == 0x58) {
+				if (chip_id == 0x56 or chip_id == 0x57 or chip_id == 0x58) {
 					// 0x56, 0x57: samples
 					// 0x58: mass production
 
@@ -1511,7 +1511,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bme280) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bme280) {
 			// BME280 -- Digital Temp/Humid/Pressure sensor
 			i2c_sensors[port][address][bus_channel][sub_address].bme280.reset(new Bme280TwoWire());
 			if (i2c_sensors[port][address][bus_channel][sub_address].bme280->begin(static_cast<Bme280TwoWireAddress>(_address), _wire) == true) {
@@ -1538,7 +1538,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x77:
-		if (bus_channel == -1 && !i2c_sensors[port][_address][-1][_address].tca9548a) {
+		if (bus_channel == -1 and not i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// 初期化
 			i2c_sensors[port][_address][-1][_address].tca9548a.reset(new QWIICMUX());
 			// チャンネルスキャン
@@ -1572,7 +1572,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				_wire->begin();
 				// map のリセットも必要？
 			}
-		} else if (bus_channel != -1 && i2c_sensors[port][_address][-1][_address].tca9548a) {
+		} else if (bus_channel != -1 and i2c_sensors[port][_address][-1][_address].tca9548a) {
 			// マルチプレクサの下についているデバイス
 			i2c_sensors[port][_address][-1][_address].tca9548a->setPort(bus_channel);
 			I2C_INIT_RESULT result = initializeDevice(port, _address, bus_channel, sub_address, true);
@@ -1581,12 +1581,12 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			return result;
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
 			// BMP280 -- Digital Barometer
 			i2c_sensors[port][address][bus_channel][sub_address].bmp280.reset(new Bme280TwoWire());
 			if (i2c_sensors[port][address][bus_channel][sub_address].bmp280->begin(static_cast<Bme280TwoWireAddress>(_address), _wire) == true) {
 				uint8_t chip_id = i2c_sensors[port][address][bus_channel][sub_address].bmp280->getChipId();
-				if (chip_id == 0x56 || chip_id == 0x57 || chip_id == 0x58) {
+				if (chip_id == 0x56 or chip_id == 0x57 or chip_id == 0x58) {
 					// 0x56, 0x57: samples
 					// 0x58: mass production
 
@@ -1611,7 +1611,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bme280) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bme280) {
 			// BME280 -- Digital Temp/Humid/Pressure sensor
 			i2c_sensors[port][address][bus_channel][sub_address].bme280.reset(new Bme280TwoWire());
 			if (i2c_sensors[port][address][bus_channel][sub_address].bme280->begin(static_cast<Bme280TwoWireAddress>(_address), _wire) == true) {
@@ -1637,7 +1637,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
 			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
 			i2c_sensors[port][address][bus_channel][sub_address].bme68x.reset(new Bme68x());
 			i2c_sensors[port][address][bus_channel][sub_address].bme68x->begin(_address, *_wire); // included soft reset
@@ -1668,7 +1668,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
-		if (!i2c_sensors[port][address][bus_channel][sub_address].gwls) {
+		if (not i2c_sensors[port][address][bus_channel][sub_address].gwls) {
 			// Grove water level sensor (initialized also 0x78)
 			i2c_sensors[port][address][bus_channel][sub_address].gwls.reset(new GroveWaterLevelSensor(_wire));
 			if (i2c_sensors[port][address][bus_channel][sub_address].gwls->begin() == true) {
@@ -3943,18 +3943,18 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 	case 0x28:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mfrc522) {
 			// RFID Unit
-			if (!i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PICC_IsNewCardPresent()) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PICC_IsNewCardPresent()) {
 				return I2C_RES_FAILED;
 			}
-			if (!i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PICC_ReadCardSerial()) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PICC_ReadCardSerial()) {
 				return I2C_RES_FAILED;
 			}
 
 			auto sak      = i2c_sensors[port][address][bus_channel][sub_address].mfrc522->uid.sak;
 			auto piccType = i2c_sensors[port][address][bus_channel][sub_address].mfrc522->PICC_GetType(sak);
 			// Check is the PICC of Classic MIFARE type
-			if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI &&
-			    piccType != MFRC522::PICC_TYPE_MIFARE_1K &&
+			if (piccType != MFRC522::PICC_TYPE_MIFARE_MINI and
+			    piccType != MFRC522::PICC_TYPE_MIFARE_1K and
 			    piccType != MFRC522::PICC_TYPE_MIFARE_4K) {
 				return I2C_RES_FAILED;
 			}
@@ -4021,9 +4021,10 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			switch (sub_id) {
 			case 0: {
 				i2c_sensors[port][address][bus_channel][sub_address].tcs34725->getRawData(&red, &green, &blue, &clear);
-				r = ((double)red / (uint32_t)clear) * 256;
-				g = ((double)green / (uint32_t)clear) * 256;
-				b = ((double)blue / (uint32_t)clear) * 256;
+				clear = clear == 0 ? 1 : clear;
+				r     = ((double)red / (uint32_t)clear) * 256;
+				g     = ((double)green / (uint32_t)clear) * 256;
+				b     = ((double)blue / (uint32_t)clear) * 256;
 
 				*i_data = 0;
 				*i_data = ((int)r << 16) + ((int)g << 8) + ((int)b << 0);
@@ -4237,14 +4238,14 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			switch (sub_id) {
 			case 0:
 				*d_data = i2c_sensors[port][address][bus_channel][sub_address].sht3x->readHumidity();
-				if (!isnan(*d_data)) {
+				if (not isnan(*d_data)) {
 					return I2C_RES_DOUBLE;
 				}
 				return I2C_RES_FAILED;
 			case 1:
 				// i2c_sensors[port][address][bus_channel][sub_address].sht3x->GetTempHum();
 				*d_data = i2c_sensors[port][address][bus_channel][sub_address].sht3x->readTemperature();
-				if (!isnan(*d_data)) {
+				if (not isnan(*d_data)) {
 					return I2C_RES_DOUBLE;
 				}
 				return I2C_RES_FAILED;
@@ -4300,14 +4301,14 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			switch (sub_id) {
 			case 0:
 				*d_data = i2c_sensors[port][address][bus_channel][sub_address].sht3x->readHumidity();
-				if (!isnan(*d_data)) {
+				if (not isnan(*d_data)) {
 					return I2C_RES_DOUBLE;
 				}
 				return I2C_RES_FAILED;
 			case 1:
 				// i2c_sensors[port][address][bus_channel][sub_address].sht3x->GetTempHum();
 				*d_data = i2c_sensors[port][address][bus_channel][sub_address].sht3x->readTemperature();
-				if (!isnan(*d_data)) {
+				if (not isnan(*d_data)) {
 					return I2C_RES_DOUBLE;
 				}
 				return I2C_RES_FAILED;
@@ -4322,7 +4323,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 				// Out of range
 				return I2C_RES_FAILED;
 			}
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ads1115->checkADS1115()) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ads1115->checkADS1115()) {
 				// Disconnected
 				return I2C_RES_FAILED;
 			}
@@ -4367,7 +4368,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 				// Out of range
 				return I2C_RES_FAILED;
 			}
-			if (!i2c_sensors[port][address][bus_channel][sub_address].ads1115->checkADS1115()) {
+			if (not i2c_sensors[port][address][bus_channel][sub_address].ads1115->checkADS1115()) {
 				// Disconnected
 				return I2C_RES_FAILED;
 			}
@@ -4384,7 +4385,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			constexpr uint8_t OUTPUT_FORM_LEN = 4;
 			uint8_t data[OUTPUT_FORM_LEN]     = {0};
 
-			while (data[0] != 0xFF && ((millis() - ref_time) < TIMEOUT_MS)) {
+			while (data[0] != 0xFF and ((millis() - ref_time) < TIMEOUT_MS)) {
 				if (i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx->rxAvailable() == 0) {
 					HAL.delay(10);
 					continue;
@@ -4393,7 +4394,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			}
 
 			uint8_t i = 1;
-			while (i != OUTPUT_FORM_LEN && ((millis() - ref_time) < TIMEOUT_MS)) {
+			while (i != OUTPUT_FORM_LEN and ((millis() - ref_time) < TIMEOUT_MS)) {
 				if (i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx->rxAvailable() == 0) {
 					HAL.delay(10);
 					continue;
@@ -4410,7 +4411,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 
 			uint8_t checksum = (data[0] + data[1] + data[2]) & 0x00FF;
 			if (data[3] != checksum) {
-				I2C_RES_FAILED;
+				return I2C_RES_FAILED;
 			}
 
 			*i_data = (data[1] << 8) + data[2];
@@ -4651,7 +4652,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter) {
 			switch (sub_id) {
 			case 0:
-				if (!i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->update()) {
+				if (not i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->update()) {
 					return I2C_RES_FAILED;
 				}
 				*d_data = i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter->getTemperature();

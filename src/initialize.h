@@ -4,6 +4,7 @@
 #include "firmware_version.h"
 
 #include "hal/hal.h"
+#include "ascii_art.h"
 
 #include "./config/setting_parameters.h"
 #include "./display/display.h"
@@ -38,6 +39,16 @@ struct TxEvent_t {
 	bool link_modbus;
 };
 
+struct TransmitterEntry {
+	IoTTx *tx;
+	struct {
+		DisplayTiming init_begin;
+		DisplayTiming connect_wifi;
+		DisplayTiming buffer_update;
+		DisplayTiming init_done;
+	} display_timing;
+};
+
 extern std::vector<struct Sensor> sensors;
 extern ParamManager param_manager;
 extern std::unique_ptr<I2C_Manager> i2c_device;
@@ -47,6 +58,7 @@ extern std::unique_ptr<IoTTxAmbient> tx_ambient;
 extern std::unique_ptr<IoTTxFTP> tx_ftp;
 extern std::unique_ptr<IoTTxHTTP> tx_http;
 extern std::unique_ptr<IoTTxMQTT> tx_mqtt;
+extern std::vector<TransmitterEntry> transmitters;
 
 void InitializeLog(const char *save_dir);
 void InitializeSettingParameter();

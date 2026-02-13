@@ -4,18 +4,18 @@
 
 ## 目次
 
-1. [はじめに](#はじめに)
-2. [デバイス追加の全体像](#デバイス追加の全体像)
-3. [必要なファイルとディレクトリ構成](#必要なファイルとディレクトリ構成)
-4. [実装手順](#実装手順)
-5. [HALインターフェース一覧](#halインターフェース一覧)
-6. [hal.h への登録](#halh-への登録)
-7. [ディスプレイオーバーライド](#ディスプレイオーバーライド)
-8. [参考実装](#参考実装)
+1. [はじめに](#-はじめに)
+2. [デバイス追加の全体像](#-デバイス追加の全体像)
+3. [必要なファイルとディレクトリ構成](#-必要なファイルとディレクトリ構成)
+4. [実装手順](#-実装手順)
+5. [HALインターフェース一覧](#-halインターフェース一覧)
+6. [hal.h への登録](#-halh-への登録)
+7. [ディスプレイオーバーライド](#-ディスプレイオーバーライド)
+8. [参考実装](#-参考実装)
 
 ---
 
-## はじめに
+## 📋 はじめに
 
 YRIT IoT Firmwareは、HAL（Hardware Abstraction Layer：ハードウェア抽象化層）を使用して、様々なハードウェアプラットフォームをサポートしています。
 
@@ -46,7 +46,7 @@ YRIT IoT Firmwareは、HAL（Hardware Abstraction Layer：ハードウェア抽�
 
 ---
 
-## デバイス追加の全体像
+## 🔍 デバイス追加の全体像
 
 ### 実装する内容
 
@@ -76,7 +76,7 @@ YRIT IoT Firmwareは、HAL（Hardware Abstraction Layer：ハードウェア抽�
 
 ---
 
-## 必要なファイルとディレクトリ構成
+## 📁 必要なファイルとディレクトリ構成
 
 新しいデバイスを追加する際の推奨ディレクトリ構成：
 
@@ -99,16 +99,16 @@ src/hal/hardware/
 
 ---
 
-## 実装手順
+## 🔧 実装手順
 
-### ステップ1: ディレクトリの作成
+### 🛠️ ステップ1: ディレクトリの作成
 
 ```bash
 mkdir -p src/hal/hardware/your_device
 cd src/hal/hardware/your_device
 ```
 
-### ステップ2: ヘッダーファイルの作成
+### 🛠️ ステップ2: ヘッダーファイルの作成
 
 `hal_your_device.h` を作成します。
 
@@ -212,7 +212,7 @@ extern IHardwareAbstractionLayer_Impl HAL;
 #endif /* ARDUINO_YOUR_DEVICE_BOARD_NAME */
 ```
 
-### ステップ3: 実装ファイルの作成
+### 🛠️ ステップ3: 実装ファイルの作成
 
 `hal_your_device.cpp` を作成します。
 
@@ -404,7 +404,7 @@ void HAL_WLAN_API::disconnectWlan(bool exit_sta_mode, bool erase_ap_settings) {
 
 ---
 
-## HALインターフェース一覧
+## 🗃️ HALインターフェース一覧
 
 実装が必要なインターフェースクラス：
 
@@ -441,7 +441,7 @@ void HAL_WLAN_API::disconnectWlan(bool exit_sta_mode, bool erase_ap_settings) {
 
 ---
 
-## hal.h への登録
+## 📝 hal.h への登録
 
 新しいデバイスを `src/hal/hal.h` に登録します。
 
@@ -495,7 +495,7 @@ void HAL_WLAN_API::disconnectWlan(bool exit_sta_mode, bool erase_ap_settings) {
 
 ---
 
-## ディスプレイオーバーライド
+## 🖼️ ディスプレイオーバーライド
 
 デフォルトの画面表示をカスタマイズする場合、ディスプレイオーバーライドを実装します。
 
@@ -529,7 +529,7 @@ void Display::drawSystemStatusBar(std::unique_ptr<OpenFontRender> &render) {
 
 ---
 
-## 参考実装
+## 📂 参考実装
 
 ### シンプルなデバイス（参考）
 
@@ -573,7 +573,7 @@ src/hal/hardware/m5stack_basic/
 
 ---
 
-## まとめ
+## 📌 まとめ
 
 ### デバイス追加の手順
 
@@ -595,12 +595,12 @@ src/hal/hardware/m5stack_basic/
    - Arduino IDEでボードを選択
    - コンパイルと動作確認
 
-### 重要なポイント
+### ✅ 重要なポイント
 
-- ✅ `hal_interface.h` のインターフェースに準拠
-- ✅ 最小限は`IHardwareAbstractionLayer`, `IDisplayControl`, `ITimerControl`, `IWirelessLanControl`を実装
-- ✅ `hal.h` でのデバイス識別条件を正確に設定
-- ✅ 既存デバイスの実装を参考にする
+- `hal_interface.h` のインターフェースに準拠
+- 最小限は`IHardwareAbstractionLayer`, `IDisplayControl`, `ITimerControl`, `IWirelessLanControl`を実装
+- `hal.h` でのデバイス識別条件を正確に設定
+- 既存デバイスの実装を参考にする
 
 ### 開発の流れ
 

@@ -29,15 +29,17 @@ struct _RemainData {
 struct _RemainData g_last_remain_data = {0};
 
 enum _DisplayPage {
-	MAIN_PAGE_1,
-	MAIN_PAGE_2,
-	MAIN_PAGE_3,
+	MAIN_PAGE_SENSOR_1,
+	MAIN_PAGE_SENSOR_2,
+	MAIN_PAGE_INFO_1,
+	MAIN_PAGE_INFO_2,
+	MAIN_PAGE_INFO_3,
 	_MAIN_PAGE_SENTINEL,
 	CONFIG_PAGE_1,
 	CONFIG_PAGE_2,
 	_CONFIG_PAGE_SENTINEL,
 };
-enum _DisplayPage g_display_page = MAIN_PAGE_1;
+enum _DisplayPage g_display_page = MAIN_PAGE_SENSOR_1;
 
 struct _Rect {
 	int32_t x;
@@ -48,15 +50,10 @@ struct _Rect {
 
 enum class _SensorType {
 	NONE,
-	GPIO,
-	I2C_INT,
-	I2C_DOUBLE,
-	I2C_STR,
-	I2C_ERR,
-	MODBUS_INT,
-	MODBUS_DOUBLE,
-	MODBUS_STR,
-	MODBUS_ERR,
+	INTEGER,
+	DOUBLE,
+	STRING,
+	ERROR,
 	CAMERA,
 };
 
@@ -78,7 +75,7 @@ struct _SensorValue g_display_memory = {_SensorType::NONE};
 
 void drawSensorName(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, bool force_update = false) {
 	static String _last_sensor_name = "";
-	if (force_update || !_last_sensor_name.equals(String(sensor_name))) {
+	if (force_update or not _last_sensor_name.equals(String(sensor_name))) {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		HAL.Display.fillRect(100, 30, 140, 30, TFT_BLACK);
@@ -111,7 +108,7 @@ void drawSensorName(std::unique_ptr<OpenFontRender> &render, const char *sensor_
 
 void drawSensorUnit(std::unique_ptr<OpenFontRender> &render, const char *sensor_unit, bool force_update = false) {
 	static String _last_unit = "";
-	if (force_update || !_last_unit.equals(String(sensor_unit))) {
+	if (force_update or not _last_unit.equals(String(sensor_unit))) {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		// Update sensor unit
@@ -141,7 +138,7 @@ void drawLastUpdateDate(std::unique_ptr<OpenFontRender> &render, struct tm timei
 	} else {
 		strftime(_s_day, 64, "- - - -", &timeinfo);
 	}
-	if (force_update || !_last_s_day.equals(String(_s_day))) {
+	if (force_update or not _last_s_day.equals(String(_s_day))) {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		render->setFontSize(18);
@@ -161,7 +158,7 @@ void drawLastUpdateDate(std::unique_ptr<OpenFontRender> &render, struct tm timei
 void drawCurrentIpAddress(std::unique_ptr<OpenFontRender> &render, String ip_addr, bool force_update = false) {
 	static String _last_ip_addr = "";
 
-	if (force_update || !_last_ip_addr.equals(ip_addr)) {
+	if (force_update or not _last_ip_addr.equals(ip_addr)) {
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		render->setFontSize(16);
@@ -240,41 +237,26 @@ void drawNetworkStatus(std::unique_ptr<OpenFontRender> &render) {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI: {
-		String _reason = "";
-		int _status    = HAL.Wlan.getStatus();
-		int _rssi      = HAL.Wlan.getRSSI();
-		_ip            = HAL.Wlan.localIP();
-		_isConnected   = false;
+		static const char *const WIFI_STATUS_MESSAGES[] = {
+		    "Idle status.",       // 0
+		    "No SSID available.", // 1
+		    "Scan Completed!",    // 2
+		    "Connected!",         // 3
+		    "Connect Failed.",    // 4
+		    "Connection Lost.",   // 5
+		    "Disconnected.",      // 6
+		};
 
-		switch (_status) {
-		case 0:
-			_reason = "Idle status.";
-			break;
-		case 1:
-			_reason = "No SSID available.";
-			break;
-		case 2:
-			_reason = "Scan Completed!";
-			break;
-		case 3:
-			_reason      = "Connected!";
-			_isConnected = true;
-			break;
-		case 4:
-			_reason = "Connect Failed.";
-			break;
-		case 5:
-			_reason = "Connection Lost.";
-			break;
-		case 6:
-			_reason = "Disconnected.";
-			break;
-		default:
-			_reason = "Disabled Wi-Fi module.";
-			break;
-		}
+		int _status  = HAL.Wlan.getStatus();
+		int _rssi    = HAL.Wlan.getRSSI();
+		_ip          = HAL.Wlan.localIP();
+		_isConnected = (_status == 3);
 
-		HAL.printf("WiFi status -> %s", _reason.c_str());
+		const char *_reason = (_status >= 0 and _status <= 6)
+		                          ? WIFI_STATUS_MESSAGES[_status]
+		                          : "Disabled Wi-Fi module.";
+
+		HAL.printf("WiFi status -> %s", _reason);
 		if (_isConnected) {
 			HAL.printf(" <RSSI Level: %d>\n", _rssi);
 		} else {
@@ -302,7 +284,7 @@ void drawNetworkStatus(std::unique_ptr<OpenFontRender> &render) {
 		break;
 	}
 
-	if (g_display_page != MAIN_PAGE_2) {
+	if (g_display_page != MAIN_PAGE_SENSOR_2) {
 		return;
 	}
 
@@ -314,63 +296,59 @@ void drawNetworkStatus(std::unique_ptr<OpenFontRender> &render) {
 }
 
 void drawInformation(std::unique_ptr<OpenFontRender> &render) {
-	struct _Rect rect     = {10, 30, 220, 19};
-	uint16_t x_water_mark = 0;
+	constexpr struct _Rect rect    = {10, 30, 220, 19};
+	constexpr uint8_t FONT_SIZE    = 14;
+	constexpr uint8_t LABEL_COUNT  = 4;
+	constexpr uint8_t SEP_GAP      = 3;
+	constexpr uint8_t SEP_WIDTH    = 2;
+	constexpr uint8_t VALUE_OFFSET = SEP_GAP + SEP_WIDTH + 5;
+	const char *const labels[]     = {"デバイス種別", "FW バージョン", "送信間隔", "接続先 Wi-Fi"};
 
-	std::vector<String> items = {
-	    "デバイス種別",
-	    "FW バージョン",
-	    "送信間隔",
-	    "接続先 Wi-Fi",
-	};
+	// ラベル幅から water mark を算出
+	render->setFontSize(FONT_SIZE);
+	uint16_t x_water_mark = 0;
+	for (auto label : labels) {
+		uint16_t w = render->getTextWidth(label);
+		if (w > x_water_mark)
+			x_water_mark = w;
+	}
+	x_water_mark += rect.x + 2;
 
 	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 
 	// draw device id
 	render->setFontSize(18);
-	render->setCursor(2, 3);
-	render->setFontColor(TFT_WHITE, MY_DARKGRAY);
-	render->printf("devID: %.7s", HAL.Info.DEVICE_ID.c_str());
-	if (HAL.Info.DEVICE_ID.length() > 7) {
-		render->printf("...");
-	}
+	render->setCursor(2, 1);
+	render->setFontColor(TFT_ORANGE, MY_DARKGRAY);
+	render->printf("各種情報 1");
 	render->setFontColor(TFT_WHITE, TFT_BLACK);
 
-	// draw title
-	// render->setFontSize(20);
-	// render->setCursor(10, 30);
-	// render->setFontColor(TFT_ORANGE);
-	// render->printf("各種情報");
-	// render->setFontColor(TFT_WHITE);
-
-	// draw items
-	render->setFontSize(14);
-	for (int i = 0; i < items.size(); i++) {
+	// draw labels
+	render->setFontSize(FONT_SIZE);
+	for (int i = 0; i < LABEL_COUNT; i++) {
 		uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
-		uint32_t y_offset = (rect.height * i);
+		uint32_t y_offset = rect.height * i;
 
-		HAL.Display.fillRect(rect.x, (rect.y + y_offset), rect.width, rect.height, bg); // draw table cell
+		HAL.Display.fillRect(rect.x, rect.y + y_offset, rect.width, rect.height, bg);
 		render->setFontColor(MY_DARKGRAY, bg);
-		render->setCursor((rect.x + 2), (rect.y + y_offset - 1));
-		render->printf(items[i].c_str());
-
-		x_water_mark = (x_water_mark < render->getCursorX()) ? render->getCursorX() : x_water_mark;
+		render->setCursor(rect.x + 2, rect.y + y_offset - 1);
+		render->printf(labels[i]);
 	}
 
-	// draw separate
-	constexpr uint8_t LINE_WIDTH = 2;
-	for (int i = 0; i < LINE_WIDTH; i++) {
-		constexpr uint8_t OFFSET = 3;
-		HAL.Display.drawFastVLine((x_water_mark + OFFSET + i), rect.y,
-		                          rect.height * items.size(), TFT_DARKGREY);
+	// draw separator
+	for (int i = 0; i < SEP_WIDTH; i++) {
+		HAL.Display.drawFastVLine(x_water_mark + SEP_GAP + i, rect.y,
+		                          rect.height * LABEL_COUNT, TFT_DARKGREY);
 	}
 
-	// draw value
-	const uint16_t VALUE_CELL_WIDTH = rect.width - x_water_mark;
-	for (int i = 0; i < items.size(); i++) {
+	// draw values
+	const uint16_t VALUE_CELL_WIDTH = rect.x + rect.width - x_water_mark - VALUE_OFFSET;
+	const uint16_t text_x           = x_water_mark + VALUE_OFFSET;
+
+	render->setFontSize(FONT_SIZE);
+	for (int i = 0; i < LABEL_COUNT; i++) {
 		uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
-		uint32_t y_offset = (rect.height * i) - 1;
-		uint32_t x_offset = 10;
+		uint32_t y_offset = rect.height * i - 1;
 
 		render->setFontColor(MY_DARKGRAY, bg);
 		String info = "- - - -";
@@ -393,13 +371,95 @@ void drawInformation(std::unique_ptr<OpenFontRender> &render) {
 		case 3:
 			info = HAL.Info.WIFI_SSID;
 			break;
-		case 4:
+		default:
+			break;
+		}
+
+		if (render->getTextWidth(info.c_str()) < VALUE_CELL_WIDTH) {
+			render->setCursor(text_x, rect.y + y_offset);
+			render->printf(info.c_str());
+		} else {
+			uint32_t size = FONT_SIZE;
+			while (render->getTextWidth(info.c_str()) > VALUE_CELL_WIDTH and size > 1) {
+				size--;
+				render->setFontSize(size);
+			}
+			render->setCursor(text_x, rect.y + y_offset);
+			render->printf(info.c_str());
+			render->setFontSize(FONT_SIZE);
+		}
+	}
+
+	render->setFontColor(TFT_WHITE, TFT_BLACK);
+	HAL.Display.giveSemaphoreMutex();
+}
+
+void drawInformation2(std::unique_ptr<OpenFontRender> &render) {
+	constexpr struct _Rect rect    = {10, 30, 220, 19};
+	constexpr uint8_t FONT_SIZE    = 14;
+	constexpr uint8_t LABEL_COUNT  = 3;
+	constexpr uint8_t SEP_GAP      = 3;
+	constexpr uint8_t SEP_WIDTH    = 2;
+	constexpr uint8_t VALUE_OFFSET = SEP_GAP + SEP_WIDTH + 5;
+	const char *const labels[]     = {"FTPサーバ", "HTTPサーバ", "MQTTサーバ"};
+
+	// ラベル幅から water mark を算出
+	render->setFontSize(FONT_SIZE);
+	uint16_t x_water_mark = 0;
+	for (auto label : labels) {
+		uint16_t w = render->getTextWidth(label);
+		if (w > x_water_mark)
+			x_water_mark = w;
+	}
+	x_water_mark += rect.x + 2;
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	// draw device id
+	render->setFontSize(18);
+	render->setCursor(2, 1);
+	render->setFontColor(TFT_ORANGE, MY_DARKGRAY);
+	render->printf("各種情報 2");
+	render->setFontColor(TFT_WHITE, TFT_BLACK);
+
+	// draw labels
+	render->setFontSize(FONT_SIZE);
+	for (int i = 0; i < LABEL_COUNT; i++) {
+		uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
+		uint32_t y_offset = rect.height * i;
+
+		HAL.Display.fillRect(rect.x, rect.y + y_offset, rect.width, rect.height, bg);
+		render->setFontColor(MY_DARKGRAY, bg);
+		render->setCursor(rect.x + 2, rect.y + y_offset - 1);
+		render->printf(labels[i]);
+	}
+
+	// draw separator
+	for (int i = 0; i < SEP_WIDTH; i++) {
+		HAL.Display.drawFastVLine(x_water_mark + SEP_GAP + i, rect.y,
+		                          rect.height * LABEL_COUNT, TFT_DARKGREY);
+	}
+
+	// draw values
+	const uint16_t VALUE_CELL_WIDTH = rect.x + rect.width - x_water_mark - VALUE_OFFSET;
+	const uint16_t text_x           = x_water_mark + VALUE_OFFSET;
+
+	render->setFontSize(FONT_SIZE);
+	for (int i = 0; i < LABEL_COUNT; i++) {
+		uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
+		uint32_t y_offset = rect.height * i - 1;
+
+		render->setFontColor(MY_DARKGRAY, bg);
+		String info = "- - - -";
+
+		switch (i) {
+		case 0:
 			info = HAL.Info.FTP_SERVER;
 			break;
-		case 5:
+		case 1:
 			info = HAL.Info.HTTP_SERVER;
 			break;
-		case 6:
+		case 2:
 			info = HAL.Info.MQTT_SERVER;
 			break;
 		default:
@@ -407,22 +467,133 @@ void drawInformation(std::unique_ptr<OpenFontRender> &render) {
 		}
 
 		if (render->getTextWidth(info.c_str()) < VALUE_CELL_WIDTH) {
-			// short strings
-			render->setCursor((x_water_mark + x_offset), (rect.y) + y_offset);
+			render->setCursor(text_x, rect.y + y_offset);
 			render->printf(info.c_str());
 		} else {
-			uint32_t size = 13;
-
-			while (render->getTextWidth(info.c_str()) > VALUE_CELL_WIDTH) {
+			uint32_t size = FONT_SIZE;
+			while (render->getTextWidth(info.c_str()) > VALUE_CELL_WIDTH and size > 1) {
 				size--;
 				render->setFontSize(size);
 			}
-
-			render->setCursor((x_water_mark + x_offset), (rect.y) + y_offset);
+			render->setCursor(text_x, rect.y + y_offset);
 			render->printf(info.c_str());
+			render->setFontSize(FONT_SIZE);
 		}
 	}
 
+	render->setFontColor(TFT_WHITE, TFT_BLACK);
+	HAL.Display.giveSemaphoreMutex();
+}
+
+void drawInformation3(std::unique_ptr<OpenFontRender> &render, bool update_only = false) {
+	constexpr struct _Rect rect    = {10, 30, 220, 19};
+	constexpr uint8_t FONT_SIZE    = 14;
+	constexpr uint8_t LABEL_COUNT  = 4;
+	constexpr uint8_t SEP_GAP      = 3;
+	constexpr uint8_t SEP_WIDTH    = 2;
+	constexpr uint8_t VALUE_OFFSET = SEP_GAP + SEP_WIDTH + 5;
+	const char *const labels[]     = {"デバイスID", "起動時間", "Free Heap", "Min Heap"};
+
+	// ラベル幅から water mark を算出
+	render->setFontSize(FONT_SIZE);
+	uint16_t x_water_mark = 0;
+	for (auto label : labels) {
+		uint16_t w = render->getTextWidth(label);
+		if (w > x_water_mark)
+			x_water_mark = w;
+	}
+	x_water_mark += rect.x + 2;
+
+	if (not update_only) {
+		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+		// draw device id
+		render->setFontSize(18);
+		render->setCursor(2, 1);
+		render->setFontColor(TFT_ORANGE, MY_DARKGRAY);
+		render->printf("各種情報 3");
+		render->setFontColor(TFT_WHITE, TFT_BLACK);
+
+		// draw labels
+		render->setFontSize(FONT_SIZE);
+		for (int i = 0; i < LABEL_COUNT; i++) {
+			uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
+			uint32_t y_offset = rect.height * i;
+
+			HAL.Display.fillRect(rect.x, rect.y + y_offset, rect.width, rect.height, bg);
+			render->setFontColor(MY_DARKGRAY, bg);
+			render->setCursor(rect.x + 2, rect.y + y_offset - 2);
+			render->printf(labels[i]);
+		}
+
+		// draw separator
+		for (int i = 0; i < SEP_WIDTH; i++) {
+			HAL.Display.drawFastVLine(x_water_mark + SEP_GAP + i, rect.y,
+			                          rect.height * LABEL_COUNT, TFT_DARKGREY);
+		}
+
+		HAL.Display.giveSemaphoreMutex();
+	}
+
+	// draw values
+	const uint16_t text_x    = x_water_mark + VALUE_OFFSET;
+	const int32_t right_edge = rect.x + rect.width;
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	render->setFontSize(FONT_SIZE);
+	auto prev_fill = render->getBackgroundFillMethod();
+	render->setBackgroundFillMethod(BgFillMethod::Block);
+
+	for (int i = 0; i < LABEL_COUNT; i++) {
+		uint16_t bg       = (i % 2 == 0) ? TFT_LIGHTGREY : TFT_WHITE;
+		uint32_t y_offset = rect.height * i;
+
+		render->setFontColor(MY_DARKGRAY, bg);
+		String info = "- - - -";
+
+		switch (i) {
+		case 0:
+			if (update_only) {
+				continue;
+			}
+			info = HAL.Info.DEVICE_ID;
+			if (info.length() > 14) {
+				info = info.substring(0, 14) + "...";
+			}
+			break;
+		case 1: {
+			unsigned long ms = millis();
+			unsigned long s  = ms / 1000;
+			unsigned long m  = s / 60;
+			unsigned long h  = m / 60;
+			unsigned long d  = h / 24;
+			char buf[32];
+			snprintf(buf, sizeof(buf), "%lu日 %lu時間 %lu分 %02lu秒", d, h % 24, m % 60, s % 60);
+			info = buf;
+			break;
+		}
+		case 2:
+			info = String(HAL.getFreeHeapSize()) + " bytes";
+			break;
+		case 3:
+			info = String(HAL.getMinimumFreeHeapSize()) + " bytes";
+			break;
+		default:
+			break;
+		}
+
+		render->setCursor(text_x, rect.y + y_offset - 2);
+		render->printf(info.c_str());
+
+		// clear remaining area after text (prevents artifacts when text gets shorter)
+		int32_t text_end_x = render->getCursorX();
+		if (text_end_x > text_x and text_end_x < right_edge) {
+			HAL.Display.fillRect(text_end_x, rect.y + y_offset, right_edge - text_end_x, rect.height, bg);
+		}
+	}
+
+	render->setBackgroundFillMethod(prev_fill);
 	render->setFontColor(TFT_WHITE, TFT_BLACK);
 	HAL.Display.giveSemaphoreMutex();
 }
@@ -519,6 +690,140 @@ void drawConfigPage(std::unique_ptr<OpenFontRender> &render, enum _DisplayPage p
 
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 //
+//  MARK: Sensor Value Update Template
+//
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
+void updateSensorDisplay_Int(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, int32_t value, const char *unit) {
+	if (g_display_page >= MAIN_PAGE_INFO_1) {
+		return;
+	}
+
+	drawSensorName(render, sensor_name);
+
+	// Update sensor value
+	OpenFontRender::Cursor c = {220, 60};
+	const struct _Rect limit = {0, 0, 115, 28};
+	const struct _Rect clear = {99, 60, 133, 33};
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	// Calculate appropriate font size
+	unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%d", value);
+	FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%d", value);
+
+	// Calculate offset for vertical centering
+	c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
+
+	render->setFontSize(fit_size);
+	render->setCursor(c.x, c.y); // set right cursor
+	HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
+	render->rprintf("%d", value);
+
+	HAL.Display.giveSemaphoreMutex();
+
+	drawSensorUnit(render, unit);
+}
+
+void updateSensorDisplay_Double(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, double value, const char *unit) {
+	if (g_display_page >= MAIN_PAGE_INFO_1) {
+		return;
+	}
+
+	drawSensorName(render, sensor_name);
+
+	// Update sensor value
+	OpenFontRender::Cursor c = {220, 60};
+	const struct _Rect limit = {0, 0, 115, 28};
+	const struct _Rect clear = {99, 60, 133, 33};
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	// Calculate appropriate font size
+	unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%.1f", value);
+	FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%.1f", value);
+
+	// Calculate offset for vertical centering
+	c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
+
+	render->setFontSize(fit_size);
+	render->setCursor(c.x, c.y); // set right cursor
+	HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
+	render->rprintf("%.1f", value);
+
+	HAL.Display.giveSemaphoreMutex();
+
+	drawSensorUnit(render, unit);
+}
+
+void updateSensorDisplay_String(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, const char *value, const char *unit) {
+	if (g_display_page >= MAIN_PAGE_INFO_1) {
+		return;
+	}
+
+	drawSensorName(render, sensor_name);
+
+	// Update sensor value
+	OpenFontRender::Cursor c = {220, 60};
+	const struct _Rect limit = {0, 0, 115, 28};
+	const struct _Rect clear = {99, 60, 133, 33};
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	// Calculate appropriate font size
+	unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%s", value);
+	FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%s", value);
+
+	// Calculate offset for vertical centering
+	c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
+
+	render->setFontSize(fit_size);
+	render->setCursor(c.x, c.y); // set right cursor
+	HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
+	render->rprintf("%s", value);
+
+	HAL.Display.giveSemaphoreMutex();
+
+	drawSensorUnit(render, unit);
+}
+
+void updateSensorDisplay_Error(std::unique_ptr<OpenFontRender> &render, const char *sensor_name) {
+	if (g_display_page >= MAIN_PAGE_INFO_1) {
+		return;
+	}
+
+	const char str[] = "Sensor Error";
+
+	drawSensorName(render, sensor_name);
+
+	// Update sensor value
+	OpenFontRender::Cursor c = {220, 60};
+	const struct _Rect limit = {0, 0, 115, 28};
+	const struct _Rect clear = {99, 60, 133, 33};
+
+	HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+
+	// Calculate appropriate font size
+	unsigned int fit_size = render->calculateFitFontSize(limit.width, limit.height, Layout::Horizontal, str);
+	FT_BBox bbox          = render->calculateBoundingBox(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, str);
+
+	// Calculate offset for vertical centering
+	c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
+
+	render->setFontSize(fit_size);
+	render->setCursor(c.x, c.y); // set right cursor
+	HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
+	render->setFontColor(TFT_YELLOW);
+	render->rprintf(str);
+	render->setFontColor(TFT_WHITE);
+
+	HAL.Display.giveSemaphoreMutex();
+
+	drawSensorUnit(render, "Failed to get value");
+}
+
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+//
 //  MARK: Callback Functions
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
@@ -574,7 +879,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 		break;
 	}
 	case DisplayTiming::SS_LOOP: {
-		if (!HAL.BtnC_wasPressed()) {
+		if (not HAL.BtnC_wasPressed()) {
 			// Nothing to do
 			break;
 		}
@@ -649,7 +954,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 			HAL.Display.fillEllipse(230, 15, 5, 5, MY_DARKGRAY);
 			HAL.Display.giveSemaphoreMutex();
 		}
-		heartbeat_circle_state = !heartbeat_circle_state;
+		heartbeat_circle_state = not heartbeat_circle_state;
 
 		// WLAN manual disconnect option
 		if (HAL.BtnA_isPressed()) {
@@ -670,6 +975,10 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 				drawNetworkStatus(render);
 			}
 			btnA_pressed_counter = 0;
+		}
+
+		if (g_display_page == MAIN_PAGE_INFO_3) {
+			drawInformation3(render, true);
 		}
 
 		break;
@@ -697,7 +1006,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 		break;
 	}
 	case DisplayTiming::BTNB_PRESSED: {
-		// if (!HAL.Tf.ready()) {
+		// if (not HAL.Tf.ready()) {
 		// 	Icon_TfCardStatus(240, 4, TfCardStatusT::UNMOUNTED);
 		// } else {
 		// 	Icon_TfCardStatus(240, 4, (HAL.Log.getCurrentLoggingState() ? TfCardStatusT::LOGGING : TfCardStatusT::NO_LOGGING));
@@ -705,7 +1014,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 		break;
 	}
 	case DisplayTiming::BTNC_PRESSED: {
-		g_display_page = ((g_display_page + 1 == _MAIN_PAGE_SENTINEL) ? MAIN_PAGE_1 : static_cast<_DisplayPage>(g_display_page + 1));
+		g_display_page = ((g_display_page + 1 == _MAIN_PAGE_SENTINEL) ? MAIN_PAGE_SENSOR_1 : static_cast<_DisplayPage>(g_display_page + 1));
 
 		HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 		HAL.Display.fillRect(0, 0, 160, 29, MY_DARKGRAY); // Clear top bar
@@ -714,7 +1023,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 		const bool FORCE_UPDATE = true;
 
 		switch (g_display_page) {
-		case MAIN_PAGE_1: {
+		case MAIN_PAGE_SENSOR_1: {
 			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 			HAL.Display.fillRect(0, 29, 240, 78, TFT_BLACK); // Clear center area
 			HAL.Display.giveSemaphoreMutex();
@@ -735,62 +1044,27 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 				drawSensorUnit(render, ""); // For force update
 
 				switch (g_display_memory.type) {
-				case _SensorType::GPIO:
-					cb_UpdateGpioValue_Default(render,
+				case _SensorType::INTEGER:
+					updateSensorDisplay_Int(render,
+					                        g_display_memory.name.c_str(),
+					                        g_display_memory.vint,
+					                        g_display_memory.unit.c_str());
+					break;
+				case _SensorType::DOUBLE:
+					updateSensorDisplay_Double(render,
 					                           g_display_memory.name.c_str(),
-					                           g_display_memory.vint,
-					                           g_display_memory.unit.c_str(),
-					                           true);
+					                           g_display_memory.vdouble,
+					                           g_display_memory.unit.c_str());
 					break;
-				case _SensorType::I2C_INT:
-					cb_UpdateI2cValueInt_Default(render,
-					                             g_display_memory.name.c_str(),
-					                             g_display_memory.vint,
-					                             g_display_memory.unit.c_str(),
-					                             true);
+				case _SensorType::STRING:
+					updateSensorDisplay_String(render,
+					                           g_display_memory.name.c_str(),
+					                           g_display_memory.vstring.c_str(),
+					                           g_display_memory.unit.c_str());
 					break;
-				case _SensorType::I2C_DOUBLE:
-					cb_UpdateI2cValueDouble_Default(render,
-					                                g_display_memory.name.c_str(),
-					                                g_display_memory.vdouble,
-					                                g_display_memory.unit.c_str(),
-					                                true);
-					break;
-				case _SensorType::I2C_STR:
-					cb_UpdateI2cValueString_Default(render,
-					                                g_display_memory.name.c_str(),
-					                                g_display_memory.vstring.c_str(),
-					                                g_display_memory.unit.c_str(),
-					                                true);
-				case _SensorType::I2C_ERR:
-					cb_UpdateI2cValueError_Default(render,
-					                               g_display_memory.name.c_str(),
-					                               true);
-					break;
-				case _SensorType::MODBUS_INT:
-					cb_UpdateModbusValueInt_Default(render,
-					                                g_display_memory.name.c_str(),
-					                                g_display_memory.vint,
-					                                g_display_memory.unit.c_str(),
-					                                true);
-					break;
-				case _SensorType::MODBUS_DOUBLE:
-					cb_UpdateModbusValueDouble_Default(render,
-					                                   g_display_memory.name.c_str(),
-					                                   g_display_memory.vdouble,
-					                                   g_display_memory.unit.c_str(),
-					                                   true);
-					break;
-				case _SensorType::MODBUS_STR:
-					cb_UpdateModbusValueString_Default(render,
-					                                   g_display_memory.name.c_str(),
-					                                   g_display_memory.vstring.c_str(),
-					                                   g_display_memory.unit.c_str(),
-					                                   true);
-				case _SensorType::MODBUS_ERR:
-					cb_UpdateModbusValueError_Default(render,
-					                                  g_display_memory.name.c_str(),
-					                                  true);
+				case _SensorType::ERROR:
+					updateSensorDisplay_Error(render,
+					                          g_display_memory.name.c_str());
 					break;
 				default:
 					break;
@@ -798,7 +1072,7 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 			}
 			break;
 		}
-		case MAIN_PAGE_2: {
+		case MAIN_PAGE_SENSOR_2: {
 			drawLeftPanelFrame();
 			drawCurrentIpAddress(render, ""); // For force update
 			drawNetworkStatus(render);
@@ -810,12 +1084,30 @@ void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render
 
 			break;
 		}
-		case MAIN_PAGE_3: {
+		case MAIN_PAGE_INFO_1: {
 			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
 			HAL.Display.fillRect(0, 29, 240, 78, TFT_ORANGE); // Clear center area
 			HAL.Display.giveSemaphoreMutex();
 
 			drawInformation(render);
+
+			break;
+		}
+		case MAIN_PAGE_INFO_2: {
+			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+			HAL.Display.fillRect(0, 29, 240, 78, TFT_ORANGE); // Clear center area
+			HAL.Display.giveSemaphoreMutex();
+
+			drawInformation2(render);
+
+			break;
+		}
+		case MAIN_PAGE_INFO_3: {
+			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
+			HAL.Display.fillRect(0, 29, 240, 78, TFT_ORANGE); // Clear center area
+			HAL.Display.giveSemaphoreMutex();
+
+			drawInformation3(render);
 
 			break;
 		}
@@ -872,335 +1164,110 @@ void cb_WaitTiming_Default(std::unique_ptr<OpenFontRender> &render, int current_
 	_last_sec = current_sec;
 }
 
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+//
+//  MARK: Sensor Value Update Callbacks
+//
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 void cb_UpdateGpioValue_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, int32_t value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%d", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%d", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%d", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name = String(sensor_name);
-		g_display_memory.unit = String(unit);
-		g_display_memory.vint = value;
-		g_display_memory.type = _SensorType::GPIO;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Int(render, sensor_name, value, unit);
+	g_display_memory.name = String(sensor_name);
+	g_display_memory.unit = String(unit);
+	g_display_memory.vint = value;
+	g_display_memory.type = _SensorType::INTEGER;
 }
 
 void cb_UpdateI2cValueInt_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, int32_t value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%d", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%d", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%d", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name = String(sensor_name);
-		g_display_memory.unit = String(unit);
-		g_display_memory.vint = value;
-		g_display_memory.type = _SensorType::I2C_INT;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Int(render, sensor_name, value, unit);
+	g_display_memory.name = String(sensor_name);
+	g_display_memory.unit = String(unit);
+	g_display_memory.vint = value;
+	g_display_memory.type = _SensorType::INTEGER;
 }
 
 void cb_UpdateI2cValueDouble_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, double value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%.1f", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%.1f", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%.1f", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name    = String(sensor_name);
-		g_display_memory.unit    = String(unit);
-		g_display_memory.vdouble = value;
-		g_display_memory.type    = _SensorType::I2C_DOUBLE;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Double(render, sensor_name, value, unit);
+	g_display_memory.name    = String(sensor_name);
+	g_display_memory.unit    = String(unit);
+	g_display_memory.vdouble = value;
+	g_display_memory.type    = _SensorType::DOUBLE;
 }
 
 void cb_UpdateI2cValueString_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, const char *value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%s", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%s", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%s", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name    = String(sensor_name);
-		g_display_memory.unit    = String(unit);
-		g_display_memory.vstring = String(value);
-		g_display_memory.type    = _SensorType::I2C_STR;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_String(render, sensor_name, value, unit);
+	g_display_memory.name    = String(sensor_name);
+	g_display_memory.unit    = String(unit);
+	g_display_memory.vstring = String(value);
+	g_display_memory.type    = _SensorType::STRING;
 }
 
 void cb_UpdateI2cValueError_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, bool selected) {
-	const char str[] = "Sensor Error";
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSize(limit.width, limit.height, Layout::Horizontal, str);
-			FT_BBox bbox          = render->calculateBoundingBox(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, str);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->setFontColor(TFT_YELLOW);
-			render->rprintf(str);
-			render->setFontColor(TFT_WHITE);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, "Failed to get value");
-		}
-
-		g_display_memory.name = String(sensor_name);
-		g_display_memory.type = _SensorType::I2C_ERR;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Error(render, sensor_name);
+	g_display_memory.name = String(sensor_name);
+	g_display_memory.type = _SensorType::ERROR;
 }
 
 void cb_UpdateModbusValueInt_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, int32_t value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%d", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%d", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%d", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name = String(sensor_name);
-		g_display_memory.unit = String(unit);
-		g_display_memory.vint = value;
-		g_display_memory.type = _SensorType::MODBUS_INT;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Int(render, sensor_name, value, unit);
+	g_display_memory.name = String(sensor_name);
+	g_display_memory.unit = String(unit);
+	g_display_memory.vint = value;
+	g_display_memory.type = _SensorType::INTEGER;
 }
 
 void cb_UpdateModbusValueDouble_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, double value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%.1f", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%.1f", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%.1f", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name    = String(sensor_name);
-		g_display_memory.unit    = String(unit);
-		g_display_memory.vdouble = value;
-		g_display_memory.type    = _SensorType::MODBUS_DOUBLE;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Double(render, sensor_name, value, unit);
+	g_display_memory.name    = String(sensor_name);
+	g_display_memory.unit    = String(unit);
+	g_display_memory.vdouble = value;
+	g_display_memory.type    = _SensorType::DOUBLE;
 }
 
 void cb_UpdateModbusValueString_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, const char *value, const char *unit, bool selected) {
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSizeFmt(limit.width, limit.height, Layout::Horizontal, "%s", value);
-			FT_BBox bbox          = render->calculateBoundingBoxFmt(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, "%s", value);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->rprintf("%s", value);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, unit);
-		}
-
-		g_display_memory.name    = String(sensor_name);
-		g_display_memory.unit    = String(unit);
-		g_display_memory.vstring = String(value);
-		g_display_memory.type    = _SensorType::MODBUS_STR;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_String(render, sensor_name, value, unit);
+	g_display_memory.name    = String(sensor_name);
+	g_display_memory.unit    = String(unit);
+	g_display_memory.vstring = String(value);
+	g_display_memory.type    = _SensorType::STRING;
 }
 
 void cb_UpdateModbusValueError_Default(std::unique_ptr<OpenFontRender> &render, const char *sensor_name, bool selected) {
-	const char str[] = "Sensor Error";
-	if (selected == true) {
-		if (g_display_page != MAIN_PAGE_3) {
-			drawSensorName(render, sensor_name);
-
-			HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-
-			// Update sensor value
-			OpenFontRender::Cursor c = {220, 60};
-			const struct _Rect limit = {0, 0, 115, 28};
-			const struct _Rect clear = {99, 60, 133, 33};
-
-			// Calculate appropriate font size
-			unsigned int fit_size = render->calculateFitFontSize(limit.width, limit.height, Layout::Horizontal, str);
-			FT_BBox bbox          = render->calculateBoundingBox(c.x, c.y, fit_size, Align::Right, Layout::Horizontal, str);
-
-			// Calculate offset for vertical centering
-			c.y = clear.y + (((clear.height - (bbox.yMax - bbox.yMin)) / 2) - (bbox.yMin - clear.y));
-
-			render->setFontSize(fit_size);
-			render->setCursor(c.x, c.y); // set right cursor
-			HAL.Display.fillRect(clear.x, clear.y, clear.width, clear.height, TFT_BLACK);
-			render->setFontColor(TFT_YELLOW);
-			render->rprintf(str);
-			render->setFontColor(TFT_WHITE);
-
-			HAL.Display.giveSemaphoreMutex();
-
-			drawSensorUnit(render, "Failed to get value");
-		}
-
-		g_display_memory.name = String(sensor_name);
-		g_display_memory.type = _SensorType::MODBUS_ERR;
+	if (selected == false) {
+		return;
 	}
+	updateSensorDisplay_Error(render, sensor_name);
+	g_display_memory.name = String(sensor_name);
+	g_display_memory.type = _SensorType::ERROR;
 }
 
 void cb_SamplingGpioSensors_Default(std::unique_ptr<OpenFontRender> &render, struct tm timeinfo) {
 	g_last_timeinfo = timeinfo;
-	if (g_display_page != MAIN_PAGE_1) {
+	if (g_display_page != MAIN_PAGE_SENSOR_1) {
 		return;
 	}
 	drawLastUpdateDate(render, timeinfo);
@@ -1211,7 +1278,7 @@ void cb_SamplingGpioSensors_Default(std::unique_ptr<OpenFontRender> &render, str
 
 void cb_SamplingI2cSensors_Default(std::unique_ptr<OpenFontRender> &render, struct tm timeinfo) {
 	g_last_timeinfo = timeinfo;
-	if (g_display_page != MAIN_PAGE_1) {
+	if (g_display_page != MAIN_PAGE_SENSOR_1) {
 		return;
 	}
 	drawLastUpdateDate(render, timeinfo);
@@ -1222,7 +1289,7 @@ void cb_SamplingI2cSensors_Default(std::unique_ptr<OpenFontRender> &render, stru
 
 void cb_SamplingModbusSensors_Default(std::unique_ptr<OpenFontRender> &render, struct tm timeinfo) {
 	g_last_timeinfo = timeinfo;
-	if (g_display_page != MAIN_PAGE_1) {
+	if (g_display_page != MAIN_PAGE_SENSOR_1) {
 		return;
 	}
 	drawLastUpdateDate(render, timeinfo);
@@ -1233,7 +1300,7 @@ void cb_SamplingModbusSensors_Default(std::unique_ptr<OpenFontRender> &render, s
 
 void cb_FtpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
 	g_last_remain_data.ftp = remain_data_quantity;
-	if (g_display_page != MAIN_PAGE_2) {
+	if (g_display_page != MAIN_PAGE_SENSOR_2) {
 		return;
 	}
 
@@ -1253,7 +1320,7 @@ void cb_FtpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int rem
 
 void cb_HttpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
 	g_last_remain_data.http = remain_data_quantity;
-	if (g_display_page != MAIN_PAGE_2) {
+	if (g_display_page != MAIN_PAGE_SENSOR_2) {
 		return;
 	}
 
@@ -1273,7 +1340,7 @@ void cb_HttpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int re
 
 void cb_MqttBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
 	g_last_remain_data.mqtt = remain_data_quantity;
-	if (g_display_page != MAIN_PAGE_2) {
+	if (g_display_page != MAIN_PAGE_SENSOR_2) {
 		return;
 	}
 
@@ -1293,7 +1360,7 @@ void cb_MqttBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int re
 
 void cb_AmbientBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
 	g_last_remain_data.ambient = remain_data_quantity;
-	if (g_display_page != MAIN_PAGE_2) {
+	if (g_display_page != MAIN_PAGE_SENSOR_2) {
 		return;
 	}
 
@@ -1312,55 +1379,28 @@ void cb_AmbientBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int
 }
 
 void cb_ReadMqttStatus_Default(std::unique_ptr<OpenFontRender> &render, int status) {
+	static const char *const MQTT_STATUS_MESSAGES[] = {
+	    "Connection Timeout.",              // -4
+	    "Connection Lost.",                 // -3
+	    "Connect Failed.",                  // -2
+	    "Disconnected.",                    // -1
+	    "Connected!",                       //  0
+	    "Server Unsupported MQTT version.", // 1
+	    "Bad Client-ID.",                   //  2
+	    "Server Unavailable.",              //  3
+	    "Bad Credential. (User/Pass)",      //  4
+	    "Unauthorized.",                    //  5
+	};
+
 	static int count = 0;
 	if (count > 10) {
-		count = 0;
-		switch (status) {
-		case -4:
-			HAL.print("MQTT status -> ");
-			HAL.println("Connection Timeout.");
-			break;
-		case -3:
-			HAL.print("MQTT status -> ");
-			HAL.println("Connection Lost.");
-			break;
-		case -2:
-			HAL.print("MQTT status -> ");
-			HAL.println("Connect Failed.");
-			break;
-		case -1:
-			HAL.print("MQTT status -> ");
-			HAL.println("Disconnected.");
-			break;
-		case 0:
-			HAL.print("MQTT status -> ");
-			HAL.println("Connected!");
-			break;
-		case 1:
-			HAL.print("MQTT status -> ");
-			HAL.println("Server Unsupported MQTT version.");
-			break;
-		case 2:
-			HAL.print("MQTT status -> ");
-			HAL.println("Bad Client-ID.");
-			break;
-		case 3:
-			HAL.print("MQTT status -> ");
-			HAL.println("Server Unavailable.");
-			break;
-		case 4:
-			HAL.print("MQTT status -> ");
-			HAL.println("Bad Credential. (User/Pass)");
-			break;
-		case 5:
-			HAL.print("MQTT status -> ");
-			HAL.println("Unauthorized.");
-			break;
-		default:
-			HAL.print("MQTT status -> ");
-			HAL.println("Unknown Error.");
-			break;
-		}
+		count           = 0;
+		int index       = status + 4;
+		const char *msg = (index >= 0 and index <= 9)
+		                      ? MQTT_STATUS_MESSAGES[index]
+		                      : "Unknown Error.";
+		HAL.print("MQTT status -> ");
+		HAL.println(msg);
 	}
 	count++;
 }
