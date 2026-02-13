@@ -1170,9 +1170,7 @@ bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
 	return true;
 }
 
-/*!
-
- */
+//
 bool HAL_SETTING_FILE_IO_API::formatStorage() {
 	return SPIFFS.format();
 }
@@ -1323,9 +1321,7 @@ void HAL_BLE_API::begin(String local_name) {
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
-/*!
-
- */
+//
 bool HAL_TF_API::begin() {
 	constexpr uint8_t TFCARD_CS_PIN = 4;
 
@@ -1346,9 +1342,7 @@ bool HAL_TF_API::begin() {
 	return _tf_available;
 }
 
-/*!
-
- */
+//
 bool HAL_TF_API::exist(String fpath) {
 	bool result = false;
 	if (!_tf_available) {
@@ -1368,10 +1362,8 @@ bool HAL_TF_API::exist(String fpath) {
 	return result;
 }
 
-/*!
-
- * @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
- */
+//
+//! @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
 bool HAL_TF_API::makeDirRecursive(String absolute_path) {
 	if (!_tf_available) {
 		return false;
@@ -1415,10 +1407,8 @@ bool HAL_TF_API::makeDirRecursive(String absolute_path) {
 	return true;
 }
 
-/*!
-
- * @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
- */
+//
+//! @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
 bool HAL_TF_API::print(const char *fpath, const char *mode, const char *str) {
 	if (!_tf_available) {
 		return false;
@@ -1442,10 +1432,8 @@ bool HAL_TF_API::print(const char *fpath, const char *mode, const char *str) {
 	return true;
 }
 
-/*!
-
- * @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
- */
+//
+//! @note SPIバスをLCDと共有しているため、LCDの排他確認（セマフォ取得）が必要
 bool HAL_TF_API::printf(const char *fpath, const char *mode, const char *fmt, ...) {
 	if (!_tf_available) {
 		return false;

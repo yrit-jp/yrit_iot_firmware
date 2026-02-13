@@ -1,0 +1,24 @@
+%%{init:{
+	'theme':'default',
+	'flowchart': {
+		'curve': 'basis',
+        'htmlLabels':'false',
+        'fontSize': '10px'
+		}
+	}
+}%%
+
+flowchart TD
+    subgraph  
+    direction TB
+    Start([定期タイマー]) --> FetchData[センサデータ取得処理]
+    FetchData --> Success{取得成功？}
+    Success -->|成功| Store[データを<br/>送信バッファに格納]
+    Success -->|失敗| Error[取得をスキップ]
+    Store --> Next{次のセンサ<br/>がある？}
+    Error --> Next
+    Next -->|あり| FetchData
+    Next -->|なし| Wait[次の定期タイマー<br/>まで待機]
+    Wait --> Start
+    end
+

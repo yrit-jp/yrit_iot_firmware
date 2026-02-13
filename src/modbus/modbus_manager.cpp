@@ -19,6 +19,7 @@ public:
 	std::unique_ptr<SEN0604> sen0604;
 	std::unique_ptr<WLD_PA> wld_pa;
 	std::unique_ptr<YPMS_482D> ypms_482d;
+	std::unique_ptr<XY_MD02> xy_md02;
 };
 
 // port, id, unique_ptr
@@ -31,12 +32,12 @@ std::map<int, std::map<int, Modbus_Sensor_List>> modbus_sensors;
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 // MARK: initializeDevice
-/*!
- * @brief Modbus デバイスの初期化を行います
- * @param [in] (port) 使用する I/O ポート
- * @param [in] (id) 初期化する Modbus デバイスのユニット番号
- * @return MODBUS_INIT_RESULT
- */
+// ==================================================================
+//! @brief Modbus デバイスの初期化を行います
+//! @param [in] (port) 使用する I/O ポート
+//! @param [in] (id) 初期化する Modbus デバイスのユニット番号
+//! @return MODBUS_INIT_RESULT
+// ==================================================================
 MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 
 	// ユーザ追加センサの初期化
@@ -135,17 +136,29 @@ MODBUS_INIT_RESULT Modbus_Manager::initializeDevice(uint8_t port, uint8_t id) {
 		}
 	}
 
+	if (!modbus_sensors[port][id].xy_md02) {
+		// XY-MD02
+		modbus_sensors[port][id].xy_md02.reset(new XY_MD02(_serial));
+		if (modbus_sensors[port][id].xy_md02->begin(id, timeout_ms) == true) {
+			// connect ok
+			return MODBUS_2_DATA_DEVICE;
+		} else {
+			modbus_sensors[port][id].xy_md02.reset();
+			HAL.delay(bus_reset_ms); // バス状態の安定化用
+		}
+	}
+
 	return MODBUS_IGNORE_DEVICE;
 }
 
 // MARK: getDeviceName
-/*!
- * @brief Modbus デバイスの識別名を返します
- * @param [in] (port) 使用する I/O ポート
- * @param [in] (id) 初期化する Modbus デバイスのユニット番号
- * @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
- * @return デバイスの識別名の文字列
- */
+// ==================================================================
+//! @brief Modbus デバイスの識別名を返します
+//! @param [in] (port) 使用する I/O ポート
+//! @param [in] (id) 初期化する Modbus デバイスのユニット番号
+//! @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
+//! @return デバイスの識別名の文字列
+// ==================================================================
 String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	// ユーザ追加センサの名前取得
@@ -157,11 +170,12 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].kw7m) {
 		// Panasonic Eco-Power meter
+		//@ url: https://industry.panasonic.com/jp/ja/products/fasys/eco/eco/kw7m
 		switch (sub_id) {
 		case 0:
-			return "KW7M KWH (" + String(id) + ")";
+			return "KW7M_KWH_(" + String(id) + ")";
 		case 1:
-			return "KW7M KW (" + String(id) + ")";
+			return "KW7M_KW_(" + String(id) + ")";
 		default:
 			return "KW7M";
 		}
@@ -169,11 +183,12 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].km_n1_flk) {
 		// Omron small power monitor
+		//@ url: https://www.fa.omron.co.jp/products/family/3413/
 		switch (sub_id) {
 		case 0:
-			return "KM_N1_FLK KWH (" + String(id) + ")";
+			return "KM_N1_FLK_KWH_(" + String(id) + ")";
 		case 1:
-			return "KM_N1_FLK W (" + String(id) + ")";
+			return "KM_N1_FLK_W_(" + String(id) + ")";
 		default:
 			return "KM_N1_FLK";
 		}
@@ -181,10 +196,12 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].ypms_482p) {
 		// Yamagata TOA DKK pH/ORP monitor
+		//@ note: ORP 版は未対応
+		//@ url: https://www.y-dkk.com/shopytd/products/detail/37
 		switch (sub_id) {
 		case 0:
 			// pH か ORP か判別ができないため、センサ種別は無し
-			return "YPMS_482P (" + String(id) + ")";
+			return "YPMS_482P_(" + String(id) + ")";
 		default:
 			return "YPMS_482P";
 		}
@@ -192,26 +209,31 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].sensing_eye_73x) {
 		// Techno-morioka EC monitor
+		//@ note: 電気伝導率か電気抵抗率かの自動判別はできない
+		//@ url: https://techmo.co.jp/sensing_eye/products/electrical_conductivity_7732/
+		//@ url: https://techmo.co.jp/sensing_eye/products/electrical_resistivity_7731/
 		switch (sub_id) {
 		case 0:
-			return "SENSING_EYE_73X EC (" + String(id) + ")";
+			return "SENSING_EYE_73X_EC_(" + String(id) + ")";
 		case 1:
-			return "SENSING_EYE_73X Temp (" + String(id) + ")";
+			return "SENSING_EYE_73X_Temp_(" + String(id) + ")";
 		default:
 			return "SENSING_EYE_73X";
 		}
 	}
 
 	if (modbus_sensors[port][id].sen0604) {
+		// DFRobot 土壌センサ
+		//@ url: https://www.switch-science.com/products/9674
 		switch (sub_id) {
 		case 0:
-			return "SEN0604 Moisture (" + String(id) + ")";
+			return "SEN0604_Moisture_(" + String(id) + ")";
 		case 1:
-			return "SEN0604 Temp (" + String(id) + ")";
+			return "SEN0604_Temp_(" + String(id) + ")";
 		case 2:
-			return "SEN0604 EC (" + String(id) + ")";
+			return "SEN0604_EC_(" + String(id) + ")";
 		case 3:
-			return "SEN0604 pH (" + String(id) + ")";
+			return "SEN0604_pH_(" + String(id) + ")";
 		default:
 			return "SEN0604";
 		}
@@ -219,11 +241,12 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].wld_pa) {
 		// Watanabe WLD-PAXXR power monitor
+		//@ url: https://www.watanabe-electric.co.jp/products/detail/13482/
 		switch (sub_id) {
 		case 0:
-			return "WLD-PA_R KWH (" + String(id) + ")";
+			return "WLD-PA_R_KWH_(" + String(id) + ")";
 		case 1:
-			return "WLD-PA_R W (" + String(id) + ")";
+			return "WLD-PA_R_W_(" + String(id) + ")";
 		default:
 			return "WLD-PA_R";
 		}
@@ -231,38 +254,52 @@ String Modbus_Manager::getDeviceName(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	if (modbus_sensors[port][id].ypms_482d) {
 		// Yamagata TOA DKK DO monitor
+		//@ url: https://www.y-dkk.com/shopytd/products/detail/40
 		switch (sub_id) {
 		case 0:
 			// 溶存酸素量
-			return "YPMS_482D DO (" + String(id) + ")";
+			return "YPMS_482D_DO_(" + String(id) + ")";
 		case 1:
 			// 酸素濃度
-			return "YPMS_482D %O2 (" + String(id) + ")";
+			return "YPMS_482D_%O2_(" + String(id) + ")";
 		case 2:
 			// 酸素飽和度
-			return "YPMS_482D %SAT (" + String(id) + ")";
+			return "YPMS_482D_%SAT_(" + String(id) + ")";
 		case 3:
 			// 大気圧
-			return "YPMS_482D hPa (" + String(id) + ")";
+			return "YPMS_482D_hPa_(" + String(id) + ")";
 		case 4:
 			// 温度
-			return "YPMS_482D \'C (" + String(id) + ")";
+			return "YPMS_482D_\'C_(" + String(id) + ")";
 		default:
 			return "YPMS_482D";
 		}
 	}
 
-	return "Unknown device";
+	if (modbus_sensors[port][id].xy_md02) {
+		// XY-MD02
+		//@ url: https://www.idbsmart.cz/wp-content/uploads/2024/05/xy-md02-manual.pdf
+		switch (sub_id) {
+		case 0:
+			return "XY-MD02_Humid_(" + String(id) + ")";
+		case 1:
+			return "XY-MD02_Temp_(" + String(id) + ")";
+		default:
+			return "XY-MD02";
+		}
+	}
+
+	return "Unknown_device";
 }
 
 // MARK: getDeviceUnit
-/*!
- * @brief Modbus デバイスが持つデータの単位を返します
- * @param [in] (port) 使用する I/O ポート
- * @param [in] (id) 初期化する Modbus デバイスのユニット番号
- * @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
- * @return 単位の文字列
- */
+// ==================================================================
+//! @brief Modbus デバイスが持つデータの単位を返します
+//! @param [in] (port) 使用する I/O ポート
+//! @param [in] (id) 初期化する Modbus デバイスのユニット番号
+//! @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
+//! @return 単位の文字列
+// ==================================================================
 String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 
 	// ユーザ追加センサの単位取得
@@ -276,8 +313,10 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Panasonic Eco-Power meter
 		switch (sub_id) {
 		case 0:
+			//@ label: 積算電力量
 			return "kWh";
 		case 1:
+			//@ label: 瞬間電力
 			return "kW";
 		default:
 			return "";
@@ -288,8 +327,10 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Omron small power monitor
 		switch (sub_id) {
 		case 0:
+			//@ label: 積算電力量
 			return "kWh";
 		case 1:
+			//@ label: 瞬間電力
 			return "W";
 		default:
 			return "";
@@ -300,6 +341,7 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Yamagata TOA DKK pH/ORP monitor
 		switch (sub_id) {
 		case 0:
+			//@ label: 水素イオン濃度
 			return "pH";
 		default:
 			return "";
@@ -310,8 +352,10 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Techno-morioka EC monitor
 		switch (sub_id) {
 		case 0:
+			//@ label: 電気伝導率・電気抵抗率
 			return "";
 		case 1:
+			//@ label: 温度
 			return "\'C";
 		default:
 			return "";
@@ -319,15 +363,20 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 	}
 
 	if (modbus_sensors[port][id].sen0604) {
+		// DFRobot 土壌センサ
 		switch (sub_id) {
 		case 0:
+			//@ label: 相対湿度
 			return "%RH";
 		case 1:
+			//@ label: 温度
 			return "\'C";
 		case 2:
+			//@ label: 電気伝導度
 			return "uS/cm";
 		case 3:
-			return "";
+			//@ label: 水素イオン濃度
+			return "pH";
 		default:
 			return "";
 		}
@@ -337,8 +386,10 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Watanabe WLD-PAXXR power monitor
 		switch (sub_id) {
 		case 0:
+			//@ label: 積算電力量
 			return "kWh";
 		case 1:
+			//@ label: 瞬間電力
 			return "W";
 		default:
 			return "";
@@ -349,19 +400,33 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 		// Yamagata TOA DKK DO monitor
 		switch (sub_id) {
 		case 0:
-			// 溶存酸素量
+			//@ label: 溶存酸素量
 			return "mg/L";
 		case 1:
-			// 酸素濃度
+			//@ label: 酸素濃度
 			return "%O2";
 		case 2:
-			// 酸素飽和度
+			//@ label: 酸素飽和度
 			return "%SAT";
 		case 3:
-			// 大気圧
+			//@ label: 大気圧
 			return "hPa";
 		case 4:
-			// 温度
+			//@ label: 温度
+			return "\'C";
+		default:
+			return "";
+		}
+	}
+
+	if (modbus_sensors[port][id].xy_md02) {
+		// XY-MD02
+		switch (sub_id) {
+		case 0:
+			//@ label: 相対湿度
+			return "%RH";
+		case 1:
+			//@ label: 温度
 			return "\'C";
 		default:
 			return "";
@@ -372,17 +437,17 @@ String Modbus_Manager::getDeviceUnit(uint8_t port, uint8_t id, int16_t sub_id) {
 }
 
 // MARK: fetchData
-/*!
- * @brief Modbus デバイスからデータを取得します
- * @param [in] (port) 使用する I/O ポート
- * @param [in] (id) 初期化する Modbus デバイスのユニット番号
- * @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
- * @param [in] (tx_buffered) 前回のデータが送信用のバッファに格納された場合は true
- * @param [out] (d_data) 返却する double 型のデータ
- * @param [out] (i_data) 返却する int 型のデータ
- * @param [out] (s_data) 返却する String 型のデータ
- * @return MODBUS_DATA_RESULT
- */
+// ==================================================================
+//! @brief Modbus デバイスからデータを取得します
+//! @param [in] (port) 使用する I/O ポート
+//! @param [in] (id) 初期化する Modbus デバイスのユニット番号
+//! @param [in] (sub_id) 複数データを持つデバイスの場合の詳細識別用 ID
+//! @param [in] (tx_buffered) 前回のデータが送信用のバッファに格納された場合は true
+//! @param [out] (d_data) 返却する double 型のデータ
+//! @param [out] (i_data) 返却する int 型のデータ
+//! @param [out] (s_data) 返却する String 型のデータ
+//! @return MODBUS_DATA_RESULT
+// ==================================================================
 MODBUS_DATA_RESULT Modbus_Manager::fetchData(uint8_t port,
                                              uint8_t id,
                                              int16_t sub_id,
@@ -576,6 +641,29 @@ MODBUS_DATA_RESULT Modbus_Manager::fetchData(uint8_t port,
 		}
 	}
 
+	if (modbus_sensors[port][id].xy_md02) {
+		switch (sub_id) {
+		case 0:
+			// 湿度
+			result = modbus_user_sensors[port][id].xy_md02->fetchHumidity(id, d_data);
+			if (result) {
+				return MODBUS_RES_DOUBLE;
+			}
+			return MODBUS_RES_FAILED;
+
+		case 1:
+			// 温度
+			result = modbus_user_sensors[port][id].xy_md02->fetchTemperature(id, d_data);
+			if (result) {
+				return MODBUS_RES_DOUBLE;
+			}
+			return MODBUS_RES_FAILED;
+
+		default:
+			return MODBUS_RES_FAILED;
+		}
+	}
+
 	return MODBUS_RES_FAILED;
 }
 
@@ -585,50 +673,50 @@ MODBUS_DATA_RESULT Modbus_Manager::fetchData(uint8_t port,
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
-/*!
- * @brief Modbus_Manager コンストラクタ
- */
+// ==================================================================
+//! @brief Modbus_Manager コンストラクタ
+// ==================================================================
 Modbus_Manager::Modbus_Manager() {
 	_active_device.reserve(16); // for memory efficient
 }
 
-/*!
- * @brief Modbus ポートを追加します
- * @param [in] (port) 追加するポート番号
- */
+// ==================================================================
+//! @brief Modbus ポートを追加します
+//! @param [in] (port) 追加するポート番号
+// ==================================================================
 void Modbus_Manager::addPort(uint8_t port) {
 	_ports.insert(port);
 }
 
-/*!
- * @brief Modbus ポートをクリアします
- */
+// ==================================================================
+//! @brief Modbus ポートをクリアします
+// ==================================================================
 void Modbus_Manager::clearPorts() {
 	_ports.clear();
 }
 
-/*!
- * @brief アクティブなデバイスのリストをクリアします
- */
+// ==================================================================
+//! @brief アクティブなデバイスのリストをクリアします
+// ==================================================================
 void Modbus_Manager::clearDevices() {
 	_active_device.clear();
 }
 
-/*!
- * @brief アクティブなデバイスのリストを取得します
- * @return アクティブなデバイスのリスト（ModbusActiveDevice）
- */
+// ==================================================================
+//! @brief アクティブなデバイスのリストを取得します
+//! @return アクティブなデバイスのリスト（ModbusActiveDevice）
+// ==================================================================
 std::vector<ModbusActiveDevice> Modbus_Manager::getIdList() {
 	return _active_device;
 }
 
-/*!
- * @brief Modbus をスキャンし、デバイスを検出します
- * @param [in] (port) スキャンするポート番号
- * @param [in] (min_id) 探索する ID の最小番号
- * @param [in] (max_id) 探索する ID の最大番号
- * @note 全範囲の ID 探索には時間がかかるため、範囲を制限可能にした
- */
+// ==================================================================
+//! @brief Modbus をスキャンし、デバイスを検出します
+//! @param [in] (port) スキャンするポート番号
+//! @param [in] (min_id) 探索する ID の最小番号
+//! @param [in] (max_id) 探索する ID の最大番号
+//! @note 全範囲の ID 探索には時間がかかるため、範囲を制限可能にした
+// ==================================================================
 void Modbus_Manager::scanDevice(uint8_t port, uint8_t min_id, uint8_t max_id) {
 	auto _serial = HAL.Modbus.getSerial(port);
 	DFRobot_RTU modbus(_serial);
@@ -694,9 +782,9 @@ void Modbus_Manager::scanDevice(uint8_t port, uint8_t min_id, uint8_t max_id) {
 	}
 }
 
-/*!
- * @brief Modbus デバイスの探索結果を表示します
- */
+// ==================================================================
+//! @brief Modbus デバイスの探索結果を表示します
+// ==================================================================
 void Modbus_Manager::displayScanResult() {
 	HAL.println("============== Scan modbus device result ===============");
 	HAL.println("--------------------------------------------------------");

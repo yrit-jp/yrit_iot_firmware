@@ -14,14 +14,14 @@ public:
 };
 std::map<int, std::map<int, I2C_User_Sensor_List>> i2c_user_sensors;
 
-/*! ==============================================================
- * @brief I2C デバイスの初期化を行います（ユーザ追加デバイス用）
- * @param[in] (port) I2C ポート番号
- * @param[in] (address) ターゲット I2C スレーブアドレス
- * @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
- * @return 初期化結果とそのセンサから取得できるデータ種別数を返します。
- * @see enum I2C_INIT_RESULT
- * ============================================================= */
+// ==============================================================
+//! @brief I2C デバイスの初期化を行います（ユーザ追加デバイス用）
+//! @param[in] (port) I2C ポート番号
+//! @param[in] (address) ターゲット I2C スレーブアドレス
+//! @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
+//! @return 初期化結果とそのセンサから取得できるデータ種別数を返します。
+//! @see enum I2C_INIT_RESULT
+// =============================================================
 I2C_INIT_RESULT initializeUserI2cDevice(uint8_t port, uint8_t address, bool is_on_top_bus) {
 	auto _wire = HAL.I2c.getWire(port);
 
@@ -58,14 +58,14 @@ I2C_INIT_RESULT initializeUserI2cDevice(uint8_t port, uint8_t address, bool is_o
 	return I2C_IGNORE_DEVICE;
 }
 
-/*! ==============================================================
- * @brief I2C センサの名前を取得します（ユーザ追加デバイス用）
- * @param[in] (port) I2C ポート番号
- * @param[in] (address) ターゲット I2C スレーブアドレス
- * @param[in] (sub_id) 取得データ識別用 ID
- * @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
- * @return I2C センサの名前を表す String 型の文字列を返します。
- * ============================================================= */
+// ==============================================================
+//! @brief I2C センサの名前を取得します（ユーザ追加デバイス用）
+//! @param[in] (port) I2C ポート番号
+//! @param[in] (address) ターゲット I2C スレーブアドレス
+//! @param[in] (sub_id) 取得データ識別用 ID
+//! @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
+//! @return I2C センサの名前を表す String 型の文字列を返します。
+// =============================================================
 String getUserI2cDeviceName(uint8_t port, uint8_t address, int16_t sub_id, bool is_on_top_bus) {
 	char s_addr[5] = {0};
 	snprintf(s_addr, 5, "0x%02X", address);
@@ -77,11 +77,11 @@ String getUserI2cDeviceName(uint8_t port, uint8_t address, int16_t sub_id, bool 
 		if (i2c_user_sensors[port][address].i2c_ct_unit) {
 			// I2C_CT Unit
 			// 複数のセンサ値を取得できるデバイスは sub_id に応じて名前を変える
-			// 「センサ名 センサ種別 (Modbusユニット番号)」の命名規則を推奨
+			// 「センサ名_センサ種別_(I2Cアドレス)」の命名規則を推奨
 			// sub_id が範囲外の場合はセンサ名だけを返すことが望ましい
 			switch (sub_id) {
 			case 0:
-				return "I2C_CT_Unit (" + String(s_addr) + ")";
+				return "I2C_CT_Unit_(" + String(s_addr) + ")";
 			default:
 				return "I2C_CT_Unit";
 			}
@@ -97,14 +97,14 @@ String getUserI2cDeviceName(uint8_t port, uint8_t address, int16_t sub_id, bool 
 	return "";
 }
 
-/*! ==============================================================
- * @brief I2C センサ値の単位を取得します（ユーザ追加デバイス用）
- * @param[in] (port) I2C ポート番号
- * @param[in] (address) ターゲット I2C スレーブアドレス
- * @param[in] (sub_id) 取得データ識別用 ID
- * @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
- * @return
- * ============================================================= */
+// ==============================================================
+//! @brief I2C センサ値の単位を取得します（ユーザ追加デバイス用）
+//! @param[in] (port) I2C ポート番号
+//! @param[in] (address) ターゲット I2C スレーブアドレス
+//! @param[in] (sub_id) 取得データ識別用 ID
+//! @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
+//! @return
+// =============================================================
 String getUserI2cDeviceUnit(uint8_t port, uint8_t address, int16_t sub_id, bool is_on_top_bus) {
 
 	switch (address) {
@@ -132,19 +132,19 @@ String getUserI2cDeviceUnit(uint8_t port, uint8_t address, int16_t sub_id, bool 
 	return "";
 }
 
-/*! ==============================================================
- * @brief I2C センサ値を取得します（ユーザ追加デバイス用）
- * @param[in] (port) I2C ポート番号
- * @param[in] (address) ターゲット I2C スレーブアドレス
- * @param[in] (sub_id) 取得データ識別用 ID
- * @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
- * @param[in] (tx_buffered) 前回値が送信バッファに格納された場合 true, それ以外は false
- * @param[out] (*d_data) 取得した double 型のセンサ値を格納するポインタ
- * @param[out] (*i_data) 取得した int 型のセンサ値を格納するポインタ
- * @param[out] (*s_data) 取得した String 型のセンサ値を格納するポインタ
- * @return 取得結果と取得したデータ型を返します。
- * @see enum I2C_DATA_RESULT
- * ============================================================= */
+// ==============================================================
+//! @brief I2C センサ値を取得します（ユーザ追加デバイス用）
+//! @param[in] (port) I2C ポート番号
+//! @param[in] (address) ターゲット I2C スレーブアドレス
+//! @param[in] (sub_id) 取得データ識別用 ID
+//! @param[in] (is_on_top_bus) マルチプレクサ下にある場合は false それ以外は true
+//! @param[in] (tx_buffered) 前回値が送信バッファに格納された場合 true, それ以外は false
+//! @param[out] (*d_data) 取得した double 型のセンサ値を格納するポインタ
+//! @param[out] (*i_data) 取得した int 型のセンサ値を格納するポインタ
+//! @param[out] (*s_data) 取得した String 型のセンサ値を格納するポインタ
+//! @return 取得結果と取得したデータ型を返します。
+//! @see enum I2C_DATA_RESULT
+// =============================================================
 I2C_DATA_RESULT fetchUserI2cDeviceData(uint8_t port,
                                        uint8_t address,
                                        int16_t sub_id,
@@ -162,14 +162,15 @@ I2C_DATA_RESULT fetchUserI2cDeviceData(uint8_t port,
 	case 0x3F:
 		if (i2c_user_sensors[port][address].i2c_ct_unit) {
 			// I2C_CT Unit
+			// 複数のセンサ値を取得できるデバイスは sub_id に応じて処理を変える
+			// 取得したセンサ値は型に応じて引数の d_data, i_data, s_data のどれかに格納する
 			result = i2c_user_sensors[port][address].i2c_ct_unit->fetchMilliAmpere(&ui_tmp);
 			if (result) {
-				// 成功した場合は取得したセンサ値の型を返す
 				*i_data = ui_tmp;
-				return I2C_RES_INT;
+				return I2C_RES_INT; // 成功した場合は取得したセンサ値の型を返す
 			}
+			return I2C_RES_FAILED; // 取得に失敗した場合は I2C_RES_FAILED を返す
 		}
-		return I2C_RES_FAILED;
 
 		/* ここに新規センサのセンサ値取得処理を追加する（ここまで）*/
 

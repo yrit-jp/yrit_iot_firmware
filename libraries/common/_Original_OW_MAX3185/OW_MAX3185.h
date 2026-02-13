@@ -30,14 +30,14 @@ public:
 		CIRCUIT_OPEN
 	};
 
-	MAX3185(uint8_t *_romId, bool _isParasiteMode) {
+	MAX3185(const uint8_t *_romId, bool _isParasiteMode) {
 		for (int i = 0; i < 8; i++) {
 			RomId[i] = _romId[i];
 		}
 		IsParasiteMode = _isParasiteMode;
 	}
 
-	bool isMatchRomId(uint8_t *_romId) {
+	bool isMatchRomId(const uint8_t *_romId) {
 		for (int i = 0; i < 8; i++) {
 			if (_romId[i] != RomId[i]) {
 				return false;
@@ -126,7 +126,7 @@ public:
 		return (_targetDeviceIndex < 0) ? false : true;
 	}
 
-	bool setTargetDevice(uint8_t *addr) {
+	bool setTargetDevice(const uint8_t *addr) {
 		return setTargetDevice(addr2index(addr));
 	}
 
@@ -154,6 +154,11 @@ public:
 		return _oneWireDevices[_targetDeviceIndex].RomId[0];
 	}
 
+	String getFamilyName(uint8_t family_code) {
+		const FamilyInfo *info = findFamily(family_code);
+		return info ? String(info->name) : String("Unknown");
+	}
+
 	bool convertT() {
 		const uint8_t CONVERT_T = 0x44;
 		if (!_one_wire->reset()) {
@@ -169,7 +174,12 @@ public:
 		}
 
 		// Fault bit のチェック
-		return ((_scratchPad.BYTE.CJ_COMP_THERMOCOUPLE_TEMP_LSB & 0x01) == 0);
+		if ((_scratchPad.BYTE.CJ_COMP_THERMOCOUPLE_TEMP_LSB & 0x01) == 0) {
+			_temperature_updated      = true;
+			_cold_temperature_updated = true;
+			return true;
+		}
+		return false;
 	}
 
 	enum MAX3185::CircuitState getCircuitState() {
@@ -184,6 +194,14 @@ public:
 			return MAX3185::CIRCUIT_SHORT_TO_VDD;
 		}
 		return MAX3185::CIRCUIT_OK;
+	}
+
+	bool checkTemperatureUpdated() {
+		return _temperature_updated;
+	}
+
+	bool checkColdTemperatureUpdated() {
+		return _cold_temperature_updated;
 	}
 
 	double getTempC() {
@@ -208,6 +226,7 @@ public:
 			weight /= 2.0; // 次のビットの重みを半分に
 		}
 
+		_temperature_updated = false;
 		return isNegative ? -(result + MIN_VALUE) : result;
 	}
 
@@ -233,14 +252,17 @@ public:
 			weight /= 2.0; // 次のビットの重みを半分に
 		}
 
+		_cold_temperature_updated = false;
 		return isNegative ? -(result + MIN_VALUE) : result;
 	}
 
 private:
 	T *_one_wire;
 	std::vector<MAX3185> _oneWireDevices;
-	int16_t _targetDeviceIndex = -1;
-	uint16_t _waitTimeMs       = 100;
+	int16_t _targetDeviceIndex     = -1;
+	uint16_t _waitTimeMs           = 100;
+	bool _temperature_updated      = false; // 更新監視用フラグ
+	bool _cold_temperature_updated = false; // 更新監視用フラグ
 	union Scratchpad {
 		uint8_t array[9];
 		struct {
@@ -257,13 +279,32 @@ private:
 	};
 	union Scratchpad _scratchPad;
 
-	int16_t addr2index(uint8_t *addr) {
+	struct FamilyInfo {
+		uint8_t code;
+		const char *name;
+	};
+
+	// 共通のヘルパー関数
+	static const FamilyInfo *findFamily(uint8_t family_code) {
+		static const FamilyInfo VALID_FAMILIES[] = {
+		    {0x3B, "MAX3185"},
+		};
+		static const size_t FAMILY_COUNT = sizeof(VALID_FAMILIES) / sizeof(VALID_FAMILIES[0]);
+
+		for (size_t i = 0; i < FAMILY_COUNT; i++) {
+			if (family_code == VALID_FAMILIES[i].code) {
+				return &VALID_FAMILIES[i];
+			}
+		}
+		return nullptr;
+	}
+
+	int16_t addr2index(const uint8_t *addr) {
 		for (int i = 0; i < _oneWireDevices.size(); i++) {
 			if (_oneWireDevices[i].isMatchRomId(addr) == true) {
 				return i;
 			}
 		}
-
 		return -1;
 	}
 
@@ -284,7 +325,7 @@ private:
 		return !((bool)result);
 	}
 
-	bool checkParasiteMode(uint8_t *addr) {
+	bool checkParasiteMode(const uint8_t *addr) {
 		const uint8_t READ_POWER_SUPPLY = 0xB4;
 
 		if (!_one_wire->reset()) {
@@ -306,14 +347,10 @@ private:
 	}
 
 	bool validFamily(const uint8_t *addr) {
-		constexpr uint8_t MAX3185_FAMILY_CODE = 0x3B;
-		if (addr[0] == MAX3185_FAMILY_CODE) {
-			return true;
-		}
-		return false;
+		return findFamily(addr[0]) != nullptr;
 	}
 
-	bool readScratchpad(uint8_t *addr) {
+	bool readScratchpad(const uint8_t *addr) {
 		const uint8_t READ_SCRATCHPAD = 0xBE;
 
 		if (!_one_wire->reset()) {
@@ -333,7 +370,7 @@ private:
 		return (_one_wire->crc8(_scratchPad.array, 8) == _scratchPad.BYTE.CRC);
 	}
 
-	bool writeScratchpad(uint8_t *addr) {
+	bool writeScratchpad(const uint8_t *addr) {
 		// const uint8_t WRITE_SCRATCHPAD = 0x4E;
 		// const uint8_t COPY_SCRATCHPAD  = 0x48;
 

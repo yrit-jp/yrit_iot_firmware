@@ -4,3 +4,9 @@
 *examples/
 .vscode
 !.vscode/settings.json
+
+__pycache__
+
+# Doxygen generated documentation
+/output/
+*.tmp

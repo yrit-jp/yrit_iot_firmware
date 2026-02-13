@@ -1,11 +1,9 @@
-/*! ==============================================================
- * xy-md02.h - Library for XY-MD02 Modbus Device
- *
- * Copyright (c) 2025 takkaO
- *
- * This software is released under the MIT License.
- * see https://opensource.org/licenses/MIT
- * ============================================================= */
+// ==============================================================
+// xy-md02.h - Library for XY-MD02 Modbus Device
+// Copyright (c) 2025 takkaO
+// This software is released under the MIT License.
+// see https://opensource.org/licenses/MIT
+// =============================================================
 
 #ifndef XY_MD02_H
 #define XY_MD02_H

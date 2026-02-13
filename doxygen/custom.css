@@ -1,0 +1,23 @@
+html {
+  --side-nav-arrow-opacity: 1 !important;
+}
+
+#projectnumber {
+  font-family: inherit;
+  font-size: 70%;
+  padding-left: 10px;
+  color: coral;
+}
+
+blockquote::before {
+  left: 5px;
+}
+
+blockquote {
+  background-color: var(--blockquote-background-color);
+  border-left-style: solid;
+  border-left-width: 5px;
+  border-left-color: forestgreen;
+  border-radius: 0;
+  color: var(--page-foreground-color);
+}

@@ -16,11 +16,11 @@ class ParamManager {
 public:
 	ParamManager();
 
-	/*! ==============================================================
-	 * @brief
-	 * @param[in] (reset_settings)
-	 * @return
-	 * ============================================================= */
+	// ==============================================================
+	//! @brief
+	//! @param[in] (reset_settings)
+	//! @return
+	// =============================================================
 	virtual enum SettingLoadResult begin(bool reset_settings = false);
 	virtual void setSettingFilePath(String fpath);
 	virtual String getSettingFilePath();

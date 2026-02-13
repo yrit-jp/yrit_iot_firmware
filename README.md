@@ -1,7 +1,7 @@
 # YRIT IoT Firmware（IoT デバイス用ファームウェア）
 
 <div align="center">
-    <img src="./assets/sample.jpg" alt="Sample">
+    <img src="./assets/sample.jpg" alt="Sample" style="max-width: 30vw;">
 </div>
 
 ## 📖 概要
@@ -13,7 +13,7 @@ IoT システムを内製したい方や低コストでの IoT 試用にご利�
 ✅ デジタル入力、パルスカウント、カメラ画像、各種 I2C センサ、Modbus（RTU）センサ に対応  
 ✅ 対応している各種センサを自動で認識  
 ✅ FTP、HTTP、MQTT、Ambient など複数の送信方法に対応  
-✅ Wi-Fi 設定や送信先サーバの設定などを、後から簡単に変更可能  
+✅ Wi-Fi 設定や送信先サーバの設定などを、後から簡単に変更可能
 
 ## 📦 ダウンロード
 
@@ -101,4 +101,3 @@ IDE 上から書き込みパラメータの設定を行います。各デバイ�
 
 Copyright (C) 2025 Yamagata Research Institute of Technology  
 Developed by takkaO
-

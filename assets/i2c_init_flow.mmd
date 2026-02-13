@@ -1,0 +1,34 @@
+%%{init:{
+	'theme':'default',
+	'flowchart': {
+		'curve': 'basis',
+        'htmlLabels':'false',
+        'fontSize': '10px'
+		}
+	}
+}%%
+
+flowchart TD
+    subgraph  
+    direction TB
+    Start([ファームウェア起動]) --> Scan[I2Cアドレススキャン]
+    Scan --> Found{応答あり？}
+    Found -->|あり| UserInit[ユーザーセンサの初期化]
+    Found -->|なし| CheckAddress
+
+    UserInit --> UserSuccess{初期化成功？}
+    UserSuccess -->|成功| GetInfo[センサ情報を取得<br>（センサ名・単位）]
+    UserSuccess -->|失敗| StdInit[標準センサの<br>初期化を試行]
+
+    StdInit --> StdSuccess{初期化成功？}
+    StdSuccess -->|成功| GetInfo
+    StdSuccess -->|失敗| OtherDevice{同じアドレスの<br>別センサがある？}
+    OtherDevice -->|あり| StdInit
+    OtherDevice -->|なし| CheckAddress
+
+    GetInfo --> Register[センサ情報を保存]
+    Register --> CheckAddress{未スキャンの<br>アドレスがある？}
+    CheckAddress -->|あり| Scan
+    CheckAddress -->|なし| End([初期化完了])
+    end
+

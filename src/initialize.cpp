@@ -16,9 +16,8 @@ std::unique_ptr<IoTTxMQTT> tx_mqtt;
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
-/*!
- * @brief SDカードへのロギング機能の初期化を行います
- */
+//
+//! @brief SDカードへのロギング機能の初期化を行います
 void InitializeLog(const char *save_dir) {
 	HAL.println("Initialize Log...");
 
@@ -32,9 +31,8 @@ void InitializeLog(const char *save_dir) {
 	}
 }
 
-/*!
- * @brief パラメータ設定機能の初期化を行います
- */
+//
+//! @brief パラメータ設定機能の初期化を行います
 void InitializeSettingParameter() {
 	HAL.print("Initialize Setting Server... ");
 	updateDisplay(DisplayTiming::SS_INIT_BEGIN, (INPUT_WAIT_TIME / 1000));
@@ -96,9 +94,8 @@ void InitializeSettingParameter() {
 	HAL.println("");
 }
 
-/*!
- * @brief LED の初期化を行います
- */
+//
+//! @brief LED の初期化を行います
 void InitializeLed() {
 	HAL.print("Initialize LED... ");
 	HAL.Led_Status.begin();
@@ -116,9 +113,8 @@ void InitializeLed() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief GPIO 機能の初期化を行います
- */
+//
+//! @brief GPIO 機能の初期化を行います
 void InitializeGPIO() {
 	HAL.print("Initialize GPIO... ");
 	updateDisplay(DisplayTiming::GPIO_INIT_BEGIN);
@@ -199,9 +195,8 @@ void InitializeGPIO() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief パルスカウンタ機能の初期化を行います
- */
+//
+//! @brief パルスカウンタ機能の初期化を行います
 void InitializePulseCounter() {
 	HAL.print("Initialize Pulse Counter... ");
 	updateDisplay(DisplayTiming::PULSE_COUNTER_INIT_BEGIN);
@@ -267,7 +262,7 @@ void InitializePulseCounter() {
 		Sensor pulse_count_sensor;
 		pulse_count_sensor.type = TYPE_PULSE_TOTAL;
 		pulse_count_sensor.name = param_manager.getParameter<const char *>(key.c_str(), "NAME");
-		pulse_count_sensor.name += "_Pulse Total";
+		pulse_count_sensor.name += "_Pulse_Total";
 		pulse_count_sensor.unit           = "";
 		pulse_count_sensor.enable         = true;
 		pulse_count_sensor.display        = false;
@@ -291,7 +286,7 @@ void InitializePulseCounter() {
 
 		pulse_count_sensor.type = TYPE_PULSE_DELTA;
 		pulse_count_sensor.name = param_manager.getParameter<const char *>(key.c_str(), "NAME");
-		pulse_count_sensor.name += "_Pulse Delta";
+		pulse_count_sensor.name += "_Pulse_Delta";
 
 		sensors.push_back(pulse_count_sensor);
 
@@ -312,9 +307,8 @@ void InitializePulseCounter() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief I2C 機能の初期化を行います
- */
+//
+//! @brief I2C 機能の初期化を行います
 void InitializeI2c() {
 	HAL.print("Initialize I2C ... ");
 	updateDisplay(DisplayTiming::I2C_INIT_PERIPHERAL_BEGIN);
@@ -340,9 +334,8 @@ void InitializeI2c() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief I2C デバイスの初期化を行います
- */
+//
+//! @brief I2C デバイスの初期化を行います
 void InitializeI2cDevice() {
 	std::vector<uint8_t> ports = HAL.I2c.getPorts();
 	if (ports.size() == 0) {
@@ -444,9 +437,8 @@ void InitializeI2cDevice() {
 	i2c_device->displayScanResult();
 }
 
-/*!
- * @brief カメラ機能の初期化を行います
- */
+//
+//! @brief カメラ機能の初期化を行います
 void InitializeCameraDevice() {
 	if (HAL.Camera.isInstalled() == false) {
 		// Camera device not installed
@@ -491,9 +483,8 @@ void InitializeCameraDevice() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief Modbus 機能の初期化を行います
- */
+//
+//! @brief Modbus 機能の初期化を行います
 void InitializeModbus() {
 	HAL.print("Initialize Modbus ... ");
 	updateDisplay(DisplayTiming::MODBUS_INIT_PERIPHERAL_BEGIN);
@@ -525,9 +516,8 @@ void InitializeModbus() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief Modbus デバイスの初期化を行います
- */
+//
+//! @brief Modbus デバイスの初期化を行います
 void InitializeModbusDevice() {
 	bool modbus_enable         = false;
 	std::vector<uint8_t> ports = HAL.Modbus.getPorts();
@@ -619,9 +609,8 @@ void InitializeModbusDevice() {
 	}
 }
 
-/*!
- * @brief タイマ割込み機能の初期化を行います
- */
+//
+//! @brief タイマ割込み機能の初期化を行います
 void InitializeTimerInterrupt() {
 	HAL.print("Initialize Timer Interrupt... ");
 	updateDisplay(DisplayTiming::TI_INIT_BEGIN);
@@ -710,9 +699,8 @@ void InitializeTimerInterrupt() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief 有線 LAN 機能の初期化を行います
- */
+//
+//! @brief 有線 LAN 機能の初期化を行います
 void InitializeWiredLan() {
 	HAL.print("Initialize Wired Lan... ");
 
@@ -743,9 +731,8 @@ void InitializeWiredLan() {
 	}
 }
 
-/*!
- * @brief 無線 LAN 機能の初期化を行います
- */
+//
+//! @brief 無線 LAN 機能の初期化を行います
 void InitializeWirelessLan() {
 	HAL.print("Initialize Wireless Lan... \n");
 	if (param_manager.checkParameter("WIFI", "SSID") == false ||
@@ -809,9 +796,8 @@ void InitializeWirelessLan() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief NTP 機能の初期化を行います
- */
+//
+//! @brief NTP 機能の初期化を行います
 void InitializeNTP() {
 	HAL.print("Initialize NTP... ");
 
@@ -887,9 +873,8 @@ void InitializeNTP() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief Ambient 機能の初期化を行います
- */
+//
+//! @brief Ambient 機能の初期化を行います
 void InitializeAmbient() {
 	HAL.print("Initialize Ambient... ");
 	updateDisplay(DisplayTiming::AMBIENT_INIT_BEGIN);
@@ -939,9 +924,8 @@ void InitializeAmbient() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief FTP 機能の初期化を行います
- */
+//
+//! @brief FTP 機能の初期化を行います
 void InitializeFTP() {
 	HAL.print("Initialize FTP... ");
 	updateDisplay(DisplayTiming::FTP_INIT_BEGIN);
@@ -986,9 +970,8 @@ void InitializeFTP() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief HTTP 機能の初期化を行います
- */
+//
+//! @brief HTTP 機能の初期化を行います
 void InitializeHTTP() {
 	HAL.print("Initialize HTTP... ");
 	updateDisplay(DisplayTiming::HTTP_INIT_BEGIN);
@@ -1020,9 +1003,8 @@ void InitializeHTTP() {
 	HAL.println("Done!");
 }
 
-/*!
- * @brief MQTT 機能の初期化を行います
- */
+//
+//! @brief MQTT 機能の初期化を行います
 void InitializeMQTT() {
 	HAL.print("Initialize MQTT... ");
 	updateDisplay(DisplayTiming::MQTT_INIT_BEGIN);
@@ -1070,10 +1052,10 @@ void InitializeMQTT() {
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
-/*! ==============================================================
- * @brief 使用機能の読み取りを行います
- * @return 機能の有効/無効を格納した構造体を返す
- * ============================================================= */
+// ==============================================================
+//! @brief 使用機能の読み取りを行います
+//! @return 機能の有効/無効を格納した構造体を返す
+// =============================================================
 struct Features ReadFeatures() {
 	struct Features feat;
 
@@ -1131,9 +1113,8 @@ struct Features ReadFeatures() {
 	return feat;
 }
 
-/*!
- * @brief 00秒待機処理
- */
+//
+//! @brief 00秒待機処理
 void WaitStartTiming() {
 	HAL.println("Wait timing 00 second...");
 	struct tm timeinfo = {0};
@@ -1151,12 +1132,11 @@ void WaitStartTiming() {
 	}
 }
 
-/*!
- * @brief 内部設定ファイルの更新を行います
- * @see InitializeSettingParameter
- * @note 設定アプリケーションからのデータ受信完了時に呼び出されます。
- * 該当するパラメータだけ更新し、更新後の設定ファイルを返信します。
- */
+//
+//! @brief 内部設定ファイルの更新を行います
+//! @see InitializeSettingParameter
+//! @note 設定アプリケーションからのデータ受信完了時に呼び出されます。
+// 該当するパラメータだけ更新し、更新後の設定ファイルを返信します。
 void UpdateSettings() {
 	// HAL.printf("esp_get_free_heap_size(): %6d\n", esp_get_free_heap_size());
 

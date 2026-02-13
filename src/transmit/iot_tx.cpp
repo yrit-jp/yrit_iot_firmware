@@ -31,9 +31,8 @@ void IoTTx::configUnixTimeField(bool enable, bool nano_precision) {
 	_unix_time_field.nano_precision = nano_precision;
 }
 
-/*!
- * @brief 保留中のデータを出力する
- */
+//
+//! @brief 保留中のデータを出力する
 void IoTTx::printPendingData() {
 	struct TX_INDEX tmp_index = _tx_idx;
 

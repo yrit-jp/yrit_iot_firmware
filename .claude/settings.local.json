@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(find:*)",
+      "Bash(mkdir:*)",
+      "Bash(docker compose:*)",
+      "Bash(go mod:*)",
+      "Bash(rm:*)",
+      "Bash(go run:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(go build:*)",
+      "Bash(rg:*)",
+      "Bash(npm init:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(npm run build-css-prod:*)",
+      "Bash(./node_modules/.bin/tailwindcss:*)",
+      "Bash(npm install:*)",
+      "Bash(mv:*)",
+      "Bash(npm run dev:*)",
+      "Bash(pkill:*)",
+      "Bash(npm run build:*)",
+      "Bash(ss:*)",
+      "Bash(cp:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(vite build)",
+      "Bash(git add:*)",
+      "Bash(npx vite:*)",
+      "Bash(sed:*)",
+      "Bash(git diff:*)",
+      "Bash(python doc_script/generate_i2c_sensor_list.py:*)",
+      "Bash(python3:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "defaultMode": "acceptEdits"
+  }
+}

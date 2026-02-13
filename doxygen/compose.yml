@@ -1,0 +1,39 @@
+services:
+  doxygen:
+    build: .
+    image: my-doxygen
+    volumes:
+      - ../:/doxygen
+    # tty: true
+    # stdin_open: true
+    # entrypoint: ["bash"]
+    environment:
+      DOXYFILE_PATH: "./doxygen/Doxyfile"
+      # 後処理スクリプトのパスを指定（オプション）
+      POST_PROCESS_SCRIPT: "./doxygen/post_process.sh"
+    command: >
+      PROJECT_NAME="YRIT IoT Firmware"
+      PROJECT_NUMBER=v5.0
+      PREDEFINED=__attribute__\(x\)=
+      LAYOUT_FILE=./doxygen/DoxygenLayout.xml
+      HTML_EXTRA_STYLESHEET="
+        /usr/local/share/doxygen-awesome-css/doxygen-awesome.css \
+        /usr/local/share/doxygen-awesome-css/doxygen-awesome-sidebar-only.css \
+        /usr/local/share/doxygen-awesome-css/doxygen-awesome-sidebar-only-darkmode-toggle.css \
+        ./doxygen/custom.css
+        "
+      HTML_EXTRA_FILES="
+        /usr/local/share/doxygen-awesome-css/doxygen-awesome-darkmode-toggle.js \
+        ./LICENSE
+        "
+      USE_MDFILE_AS_MAINPAGE="README.md"
+      INPUT="
+        ./README.md \
+        ./notes/SUPPORTED_I2C_DEVICES.md \
+        ./notes/SUPPORTED_MODBUS_DEVICES.md \
+        ./notes/HOW_TO_ADD_I2C_SENSOR.md \
+        ./notes/HOW_TO_ADD_I2C_SENSOR_TO_MANAGER.md \
+        ./notes/HOW_TO_ADD_MODBUS_SENSOR.md \
+        ./main.ino
+        "
+    container_name: doc-container

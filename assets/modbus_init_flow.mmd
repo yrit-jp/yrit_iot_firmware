@@ -1,0 +1,44 @@
+%%{init:{
+	'theme':'default',
+	'flowchart': {
+		'curve': 'basis',
+        'htmlLabels':'false',
+        'fontSize': '10px'
+		}
+	}
+}%%
+
+flowchart TD
+    subgraph  
+    direction TB
+    Start([ファームウェア起動])
+    Scan[ユニットIDスキャン<br/>※設定で指定された範囲内]
+    Found{応答あり？}
+    UserInit[ユーザーセンサの初期化]
+    UserSuccess{初期化成功？}
+    StdInit[標準センサの<br/>初期化を試行]
+    StdSuccess{初期化成功？}
+    OtherDevice{同じIDの<br/>別センサがある？}
+    GetInfo[センサ情報を取得<br/>センサ名・単位]
+    Register[センサ情報を保存]
+    CheckID{未スキャンの<br/>IDがある？}
+    End([初期化完了])
+
+    Start --> Scan
+    Scan --> Found
+    Found -->|あり| UserInit
+    Found -->|なし| CheckID
+    UserInit --> UserSuccess
+    UserSuccess -->|成功| GetInfo
+    UserSuccess -->|失敗| StdInit
+    StdInit --> StdSuccess
+    StdSuccess -->|成功| GetInfo
+    StdSuccess -->|失敗| OtherDevice
+    OtherDevice -->|あり| StdInit
+    OtherDevice -->|なし| CheckID
+    GetInfo --> Register
+    Register --> CheckID
+    CheckID -->|あり| Scan
+    CheckID -->|なし| End
+    end
+

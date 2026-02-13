@@ -18,6 +18,7 @@
 #include "LTR_553ALS.h"
 #include "M5AmMeterUnit.h"
 #include "M5UnitWeightI2C.h"
+#include "M5VoltMeterUnit.h"
 #include "M5_EXTIO2.h"
 #include "M5_KMeter.h"
 #include "MCP23017.h"
@@ -38,6 +39,7 @@
 #include "TSL2561.h"
 #include "UNIT_KMETER.h"
 #include "VL53L0X.h"
+#include "VL53L1X.h"
 #include "bme68xLibrary.h"
 
 class I2C_Sensor_List {
@@ -53,8 +55,6 @@ public:
 	std::unique_ptr<Adafruit_SGP30> sgp30;
 	std::unique_ptr<QWIICMUX> tca9548a;
 	std::unique_ptr<MFRC522> mfrc522;
-	std::unique_ptr<OW_DS18XXX<DS248X>> ds18xxx_ds248x;
-	std::unique_ptr<OW_DS18XXX<DS2485>> ds18xxx_ds2485;
 	std::unique_ptr<TSL2561> tsl2561;
 	std::unique_ptr<QMP6988> qmp6988;
 	std::unique_ptr<PCA9554> pca9554;
@@ -73,7 +73,7 @@ public:
 	std::unique_ptr<EZO_DO> ezo_do;
 	std::unique_ptr<BH1750> bh1750fvi;
 	std::unique_ptr<M5_EXTIO2> m5_extio2;
-	std::unique_ptr<M5AmMeterUnit> m5_ammeter;
+	std::unique_ptr<M5AmMeterUnit> m5_am_meter;
 	// std::unique_ptr<SensirionI2CSen5x> sen50;
 	std::unique_ptr<SensirionI2CSen5x> sen54;
 	// std::unique_ptr<SensirionI2CSen5x> sen55;
@@ -84,7 +84,15 @@ public:
 	std::unique_ptr<M5UnitWeightI2C> m5_weight;
 	std::unique_ptr<DFRobot_AHT20> ahtxx;
 	std::unique_ptr<LTR_553ALS> ltr_553als;
-	std::unique_ptr<OW_MAX3185<DS2485>> max3185_ds2485;
+	std::unique_ptr<VL53L1X> vl53l1x;
+	std::unique_ptr<M5VoltMeterUnit> m5_volt_meter;
+	// 1-Wire to I2C bridge
+	std::unique_ptr<DS248X> ds248x;
+	std::unique_ptr<OW_DS18XXX<DS248X>> ow_ds18xxx_ds248x;
+	std::unique_ptr<OW_MAX3185<DS248X>> ow_max3185_ds248x;
+	std::unique_ptr<DS2485> ds2485;
+	std::unique_ptr<OW_DS18XXX<DS2485>> ow_ds18xxx_ds2485;
+	std::unique_ptr<OW_MAX3185<DS2485>> ow_max3185_ds2485;
 };
 // port, address, bus_channel, sub_address, unique_ptr
 std::map<int, std::map<int, std::map<int, std::map<int, I2C_Sensor_List>>>> i2c_sensors;
@@ -140,60 +148,91 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x18:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			DS248X dc(_wire, _address);
+		// DS248X: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
+		if (!i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			// DS248X を初期化
+			i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset(new DS248X(_wire, _address));
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x.reset(new OW_DS18XXX<DS248X>(&dc));
-			if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->begin()) {
-				// OneWire DS18XXX
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getOneWireDeviceNum();
+			// DS18XXX センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset(
+				    new OW_DS18XXX<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
-				uint8_t ow_addr[8]     = {0};
-				const uint8_t DS18S20  = 0x10; // also DS1820
-				const uint8_t DS18B20  = 0x28; // also MAX31820
-				const uint8_t DS1822   = 0x22;
-				const uint8_t DS1825   = 0x3B;
-				const uint8_t DS28EA00 = 0x42;
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->begin()) {
+					// OneWire DS18XXX
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getOneWireDeviceNum();
 
-				for (int i = 0; i < num; i++) {
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(i);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
 
-					String pname = "";
-					switch (ow_addr[0]) {
-					case DS18S20:
-						pname = "DS18S20";
-						break;
-					case DS18B20:
-						pname = "DS18B20";
-						break;
-					case DS1822:
-						pname = "DS1822";
-						break;
-						//			case DS1825: // MAX31850 との判定方法の検討が必要
-						//				pname = "DS1825";
-						//				break;
-					case DS28EA00:
-						pname = "DS28EA00";
-						break;
-					default:
-						HAL.printf("\n        (%d) Unknown [%02X%02X%02X%02X%02X%02X%02X%02X]", i + 1,
-						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-						continue;
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getFamilyName(ow_addr[0]);
+
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
+						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->isParasiteMode() ? "Parasite" : "");
+
+						// 温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds248x->pushSensor(ow_addr, static_cast<uint8_t>(I2C_1_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setResolution(12);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTempC();
 					}
-
-					HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
-					           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
-					           i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->isParasiteMode() ? "Parasite" : "");
-
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setResolution(12);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTempC(true);
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は ds18xxx をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
 				}
-				HAL.printf("\n    ");
-				return static_cast<I2C_INIT_RESULT>(num);
+			}
+
+			// MAX3185 センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset(
+				    new OW_MAX3185<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
+
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->begin()) {
+					// OneWire MAX3185
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getOneWireDeviceNum();
+
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getTargetDeviceAddress(ow_addr);
+
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getFamilyName(ow_addr[0]);
+
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
+						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->isParasiteMode() ? "Parasite" : "");
+
+						// 温度、冷接点温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds248x->pushSensor(ow_addr, static_cast<uint8_t>(I2C_2_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+					}
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は max3185 をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
+				}
+			}
+
+			// 初期化できた 1-wire センサ数をチェック
+			uint16_t sensor_value_count = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getSensorValueCount();
+			if (sensor_value_count != 0) {
+				return static_cast<I2C_INIT_RESULT>(sensor_value_count);
 			} else {
-				// Other OneWire sensor
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x.reset();
+				// 利用可能な 1-wire デバイスが存在しなかった
+				i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset();
 				// 安定化のため Wire をリセットする
 				_wire->end();
 				HAL.delay(20);
@@ -204,60 +243,91 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 	case 0x19:
 	case 0x1A:
 	case 0x1B:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			DS248X dc(_wire, _address);
+		// DS248X: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
+		if (!i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			// DS248X を初期化
+			i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset(new DS248X(_wire, _address));
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x.reset(new OW_DS18XXX<DS248X>(&dc));
-			if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->begin()) {
-				// OneWire DS18XXX
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getOneWireDeviceNum();
+			// DS18XXX センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset(
+				    new OW_DS18XXX<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
 
-				uint8_t ow_addr[8]     = {0};
-				const uint8_t DS18S20  = 0x10; // also DS1820
-				const uint8_t DS18B20  = 0x28; // also MAX31820
-				const uint8_t DS1822   = 0x22;
-				const uint8_t DS1825   = 0x3B;
-				const uint8_t DS28EA00 = 0x42;
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->begin()) {
+					// OneWire DS18XXX
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getOneWireDeviceNum();
 
-				for (int i = 0; i < num; i++) {
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(i);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
 
-					String pname = "";
-					switch (ow_addr[0]) {
-					case DS18S20:
-						pname = "DS18S20";
-						break;
-					case DS18B20:
-						pname = "DS18B20";
-						break;
-					case DS1822:
-						pname = "DS1822";
-						break;
-						//			case DS1825: // MAX31850 との判定方法の検討が必要
-						//				pname = "DS1825";
-						//				break;
-					case DS28EA00:
-						pname = "DS28EA00";
-						break;
-					default:
-						HAL.printf("\n        (%d) Unknown [%02X%02X%02X%02X%02X%02X%02X%02X]", i + 1,
-						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-						continue;
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getFamilyName(ow_addr[0]);
+
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
+						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->isParasiteMode() ? "Parasite" : "");
+
+						// 温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds248x->pushSensor(ow_addr, static_cast<uint8_t>(I2C_1_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setResolution(12);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTempC();
 					}
-
-					HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
-					           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
-					           i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->isParasiteMode() ? "Parasite" : "");
-
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setResolution(12);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTempC(true);
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は ds18xxx をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
 				}
-				HAL.printf("\n    ");
-				return static_cast<I2C_INIT_RESULT>(num);
+			}
+
+			// MAX3185 センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset(
+				    new OW_MAX3185<DS248X>(i2c_sensors[port][address][bus_channel][sub_address].ds248x.get()));
+
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->begin()) {
+					// OneWire MAX3185
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getOneWireDeviceNum();
+
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getTargetDeviceAddress(ow_addr);
+
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getFamilyName(ow_addr[0]);
+
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
+						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->isParasiteMode() ? "Parasite" : "");
+
+						// 温度、冷接点温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds248x->pushSensor(ow_addr, static_cast<uint8_t>(I2C_2_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+					}
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は max3185 をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
+				}
+			}
+
+			// 初期化できた 1-wire センサ数をチェック
+			uint16_t sensor_value_count = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getSensorValueCount();
+			if (sensor_value_count != 0) {
+				return static_cast<I2C_INIT_RESULT>(sensor_value_count);
 			} else {
-				// Other OneWire sensor
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x.reset();
+				// 利用可能な 1-wire デバイスが存在しなかった
+				i2c_sensors[port][address][bus_channel][sub_address].ds248x.reset();
 				// 安定化のため Wire をリセットする
 				_wire->end();
 				HAL.delay(20);
@@ -505,6 +575,25 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 			}
 		}
 
+		if (!i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
+			// ToF Unit
+			i2c_sensors[port][address][bus_channel][sub_address].vl53l1x.reset(new VL53L1X());
+			i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->setBus(_wire);
+			i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->setTimeout(500);
+			if (i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->init()) {
+				i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->setDistanceMode(VL53L1X::Long);
+				i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->setMeasurementTimingBudget(50000);
+				i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->startContinuous(50);
+				return I2C_1_DATA_DEVICE;
+			} else {
+				i2c_sensors[port][address][bus_channel][sub_address].vl53l1x.reset();
+				// 安定化のため Wire をリセットする
+				_wire->end();
+				HAL.delay(20);
+				_wire->begin();
+			}
+		}
+
 		if (!i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
 			// Color Unit
 			i2c_sensors[port][address][bus_channel][sub_address].tcs34725.reset(new Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_50MS, TCS34725_GAIN_4X));
@@ -566,105 +655,93 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x40:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485) {
-			// DS18B20 over DS2485
-			DS2485 dc(_wire, _address);
-			dc.deviceReset();
-			dc.setRPUP();
+		// DS2485: 1-Wire to I2C bridge と配下の 1-wire デバイスを初期化
+		if (!i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
+			// DS2485 を初期化
+			i2c_sensors[port][address][bus_channel][sub_address].ds2485.reset(new DS2485(_wire, _address));
+			i2c_sensors[port][address][bus_channel][sub_address].ds2485->deviceReset();
+			i2c_sensors[port][address][bus_channel][sub_address].ds2485->setRPUP();
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485.reset(new OW_DS18XXX<DS2485>(&dc));
-			if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->begin()) {
-				// OneWire DS18XXX
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getOneWireDeviceNum();
+			// DS18XXX センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485.reset(
+				    new OW_DS18XXX<DS2485>(i2c_sensors[port][address][bus_channel][sub_address].ds2485.get()));
 
-				uint8_t ow_addr[8]     = {0};
-				const uint8_t DS18S20  = 0x10; // also DS1820
-				const uint8_t DS18B20  = 0x28; // also MAX31820
-				const uint8_t DS1822   = 0x22;
-				const uint8_t DS1825   = 0x3B;
-				const uint8_t DS28EA00 = 0x42;
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->begin()) {
+					// OneWire DS18XXX
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getOneWireDeviceNum();
 
-				for (int i = 0; i < num; i++) {
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->setTargetDevice(i);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getTargetDeviceAddress(ow_addr);
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getTargetDeviceAddress(ow_addr);
 
-					String pname = "";
-					switch (ow_addr[0]) {
-					case DS18S20:
-						pname = "DS18S20";
-						break;
-					case DS18B20:
-						pname = "DS18B20";
-						break;
-					case DS1822:
-						pname = "DS1822";
-						break;
-						//			case DS1825: // MAX31850 との判定方法の検討が必要
-						//				pname = "DS1825";
-						//				break;
-					case DS28EA00:
-						pname = "DS28EA00";
-						break;
-					default:
-						HAL.printf("\n        (%d) Unknown [%02X%02X%02X%02X%02X%02X%02X%02X]", i + 1,
-						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-						continue;
-					}
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getFamilyName(ow_addr[0]);
 
-					HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
-					           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
-					           i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->isParasiteMode() ? "Parasite" : "");
-
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->setResolution(12);
-					i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getTempC(true);
-				}
-				HAL.printf("\n    ");
-				return static_cast<I2C_INIT_RESULT>(num);
-			} else {
-				// Other OneWire sensor
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485.reset();
-				// 安定化のため Wire をリセットする
-				_wire->end();
-				HAL.delay(20);
-				_wire->begin();
-			}
-		}
-
-		if (!i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485) {
-			// DS18B20 over DS2485
-			DS2485 dc(_wire, _address);
-			dc.deviceReset();
-			dc.setRPUP();
-
-			i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485.reset(new OW_MAX3185<DS2485>(&dc));
-			if (i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->begin()) {
-				// OneWire DS18XXX
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getOneWireDeviceNum();
-
-				uint8_t ow_addr[8] = {0};
-				for (int i = 0; i < num; i++) {
-					i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->setTargetDevice(i);
-					i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getTargetDeviceAddress(ow_addr);
-
-					constexpr uint8_t MAX3185X_FAMILY_CODE = 0x3B;
-					if (ow_addr[0] == MAX3185X_FAMILY_CODE) {
-						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, "MAX3185",
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
 						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
-						           i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->isParasiteMode() ? "Parasite" : "");
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->isParasiteMode() ? "Parasite" : "");
 
-					} else {
-						HAL.printf("\n        (%d) Unknown [%02X%02X%02X%02X%02X%02X%02X%02X]", i + 1,
-						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-						continue;
+						// 温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds2485->pushSensor(ow_addr, static_cast<uint8_t>(I2C_1_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->setResolution(12);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getTempC();
 					}
-
-					i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->convertT();
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は ds18xxx をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
 				}
-				HAL.printf("\n    ");
-				return static_cast<I2C_INIT_RESULT>(num * 2);
+			}
+
+			// MAX3185 センサーの初期化
+			if (!i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
+				i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485.reset(
+				    new OW_MAX3185<DS2485>(i2c_sensors[port][address][bus_channel][sub_address].ds2485.get()));
+
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->begin()) {
+					// OneWire MAX3185
+					uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getOneWireDeviceNum();
+
+					uint8_t ow_addr[8] = {0};
+					for (int i = 0; i < num; i++) {
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->setTargetDevice(i);
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getTargetDeviceAddress(ow_addr);
+
+						String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getFamilyName(ow_addr[0]);
+
+						HAL.printf("\n        (%d) %s [%02X%02X%02X%02X%02X%02X%02X%02X] %s", i + 1, pname.c_str(),
+						           ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7],
+						           i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->isParasiteMode() ? "Parasite" : "");
+
+						// 温度、冷接点温度
+						i2c_sensors[port][address][bus_channel][sub_address].ds2485->pushSensor(ow_addr, static_cast<uint8_t>(I2C_2_DATA_DEVICE));
+
+						i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->convertT();
+					}
+					HAL.printf("\n    ");
+				} else {
+					// begin 失敗時は max3185 をリセット
+					i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485.reset();
+					// 安定化のため Wire をリセットする
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
+				}
+			}
+
+			// 初期化できた 1-wire センサ数をチェック
+			uint16_t sensor_value_count = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getSensorValueCount();
+			if (sensor_value_count != 0) {
+				return static_cast<I2C_INIT_RESULT>(sensor_value_count);
 			} else {
-				// Other OneWire sensor
-				i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485.reset();
+				// 利用可能な 1-wire デバイスが存在しなかった
+				i2c_sensors[port][address][bus_channel][sub_address].ds2485.reset();
 				// 安定化のため Wire をリセットする
 				_wire->end();
 				HAL.delay(20);
@@ -985,7 +1062,7 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 		}
 		break;
 	case 0x51:
-		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter) {
+		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
 			// M5 Ampere meter unit
 			uint8_t root_address = (address == 0x51) ? 0x48 : address; // 0x51 以外の時はマルチプレクサ経由
 			if (i2c_sensors[port][root_address][bus_channel][0x48].ads1115) {
@@ -995,8 +1072,31 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				i2c_sensors[port][root_address][bus_channel][0x48].ads1115->setRate(eRATE_128);        // 8SPS (default)
 				i2c_sensors[port][root_address][bus_channel][0x48].ads1115->setOSMode(eOSMODE_SINGLE); // Set to start a single-conversion
 
-				i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter.reset(new M5AmMeterUnit(_wire));
-				i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter->setGain(ADS1115_PGA_512);
+				i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter.reset(new M5AmMeterUnit(_wire));
+				i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter->setGain(ADS1115_PGA_512);
+				return I2C_1_DATA_DEVICE;
+			}
+		}
+		break;
+	case 0x53:
+		if (!i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
+			// M5 Volt meter unit
+			uint8_t root_address = (address == 0x53) ? 0x49 : address; // 0x53 以外の時はマルチプレクサ経由
+			if (i2c_sensors[port][root_address][bus_channel][0x49].ads1115) {
+				// 同じバス上にads1115 がいる場合、電圧センサ用に再初期化
+				i2c_sensors[port][root_address][bus_channel][0x49].ads1115->setGain(eGAIN_EIGHT);      // 512
+				i2c_sensors[port][root_address][bus_channel][0x49].ads1115->setMode(eMODE_SINGLE);     // single-shot mode
+				i2c_sensors[port][root_address][bus_channel][0x49].ads1115->setRate(eRATE_128);        // 8SPS (default)
+				i2c_sensors[port][root_address][bus_channel][0x49].ads1115->setOSMode(eOSMODE_SINGLE); // Set to start a single-conversion
+
+				i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter.reset(new M5VoltMeterUnit(_wire));
+				i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter->setGain(ADS1115_PGA_512);
+				// | PGA      | Max Input Voltage(V) |
+				// | PGA_6144 |        128           |
+				// | PGA_4096 |        64            |
+				// | PGA_2048 |        32            |
+				// | PGA_512  |        16            |
+				// | PGA_256  |        8             |
 				return I2C_1_DATA_DEVICE;
 			}
 		}
@@ -1615,9 +1715,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x09:
 		if (i2c_sensors[port][address][bus_channel][sub_address].dt_s1) {
 			// flexible thermistor
+			//@ url: https://www.semitec.co.jp/uploads/IoT_DigitalThermistor-1-.03.pdf
 			switch (sub_id) {
 			case 0:
-				return "DT-S1 (" + String(s_addr) + ")";
+				return "DT-S1_(" + String(s_addr) + ")";
 			default:
 				return "DT-S1";
 			}
@@ -1627,78 +1728,116 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		// BMM150 -- 3-Axis Geomagnetic Sensor
 		return "BMM150";
 	case 0x18:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			uint8_t ow_addr[8]     = {0};
-			const uint8_t DS18S20  = 0x10; // also DS1820
-			const uint8_t DS18B20  = 0x28; // also MAX31820
-			const uint8_t DS1822   = 0x22;
-			const uint8_t DS1825   = 0x3B;
-			const uint8_t DS28EA00 = 0x42;
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			// DS248X: 1-Wire to I2C bridge
 
-			if (0 <= sub_id) {
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(sub_id);
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
+			// sub_id < 0 の場合、DS248X 全体の情報を返す
+			if (sub_id < 0) {
+				auto total_nodes = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceCount();
+				return "DS248X_(" + String(total_nodes) + "-nodes)";
+			}
 
-				char ow_addr_str[128] = {0};
-				snprintf(ow_addr_str, 128, " [%02X%02X%02X%02X%02X%02X%02X%02X]",
-				         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
+			char ow_addr_str[128]  = {0};
+			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
-				switch (ow_addr[0]) {
-				case DS18S20:
-					return "DS18S20" + String(ow_addr_str);
-				case DS18B20:
-					return "DS18B20" + String(ow_addr_str);
-				case DS1822:
-					return "DS1822" + String(ow_addr_str);
-				case DS1825:
-					return "DS1825" + String(ow_addr_str);
-				case DS28EA00:
-					return "DS28EA00" + String(ow_addr_str);
-				default:
-					break;
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				//@ key: DS18B20
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://strawberry-linux.com/catalog/items?code=12331
+				//@ url: https://www.analog.com/media/en/technical-documentation/data-sheets/ds2484.pdf
+				//@ url: https://www.mouser.jp/datasheet/3/1014/1/DS2482_100.pdf
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
 				}
-			} else {
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getOneWireDeviceNum();
-				return "DS248X (" + String(num) + " nodes)";
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				//@ key: MAX31850K
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://www.switch-science.com/products/4102
+				//@ url: https://www.analog.com/media/en/technical-documentation/data-sheets/ds2484.pdf
+				//@ url: https://www.mouser.jp/datasheet/3/1014/1/DS2482_100.pdf
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + "_Temp_Junc" + String(ow_addr_str);
+					case 1:
+						return pname + "_Temp_Cold" + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
+				}
 			}
 		}
 		break;
 	case 0x19:
 	case 0x1A:
 	case 0x1B:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			uint8_t ow_addr[8]     = {0};
-			const uint8_t DS18S20  = 0x10; // also DS1820
-			const uint8_t DS18B20  = 0x28; // also MAX31820
-			const uint8_t DS1822   = 0x22;
-			const uint8_t DS1825   = 0x3B;
-			const uint8_t DS28EA00 = 0x42;
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			// DS248X: 1-Wire to I2C bridge
 
-			if (0 <= sub_id) {
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(sub_id);
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTargetDeviceAddress(ow_addr);
+			// sub_id < 0 の場合、DS248X 全体の情報を返す
+			if (sub_id < 0) {
+				auto total_nodes = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceCount();
+				return "DS248X_(" + String(total_nodes) + "-nodes)";
+			}
 
-				char ow_addr_str[128] = {0};
-				snprintf(ow_addr_str, 128, " [%02X%02X%02X%02X%02X%02X%02X%02X]",
-				         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
+			char ow_addr_str[128]  = {0};
+			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
-				switch (ow_addr[0]) {
-				case DS18S20:
-					return "DS18S20" + String(ow_addr_str);
-				case DS18B20:
-					return "DS18B20" + String(ow_addr_str);
-				case DS1822:
-					return "DS1822" + String(ow_addr_str);
-				case DS1825:
-					return "DS1825" + String(ow_addr_str);
-				case DS28EA00:
-					return "DS28EA00" + String(ow_addr_str);
-				default:
-					break;
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				//@ key: DS18B20
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://strawberry-linux.com/catalog/items?code=12331
+				//@ url: https://www.analog.com/media/en/technical-documentation/data-sheets/ds2484.pdf
+				//@ url: https://www.mouser.jp/datasheet/3/1014/1/DS2482_100.pdf
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
 				}
-			} else {
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getOneWireDeviceNum();
-				return "DS248X (" + String(num) + " nodes)";
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				//@ key: MAX31850K
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://www.switch-science.com/products/4102
+				//@ url: https://www.analog.com/media/en/technical-documentation/data-sheets/ds2484.pdf
+				//@ url: https://www.mouser.jp/datasheet/3/1014/1/DS2482_100.pdf
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + "_Temp_Junc" + String(ow_addr_str);
+					case 1:
+						return pname + "_Temp_Cold" + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
+				}
 			}
 		}
 		break;
@@ -1707,21 +1846,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x22:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ url: https://akizukidenshi.com/catalog/g/g109486/
 			switch (sub_id) {
 			case 0:
-				return "MCP23017 GPIO_A (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_A_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP23017 GPIO_B (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_B_(" + String(s_addr) + ")";
 			default:
 				return "MCP23017";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
-			// MCP23017
+			// PCA9554
+			//@ url: https://www.switch-science.com/products/6552
 			switch (sub_id) {
 			case 0:
-				return "PCA9554 (" + String(s_addr) + ")";
+				return "PCA9554_(" + String(s_addr) + ")";
 			default:
 				return "PCA9554";
 			}
@@ -1730,11 +1871,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x23:
 		if (i2c_sensors[port][address][bus_channel][sub_address].ltr_553als) {
 			// LTR_553ALS
+			//@ url: https://optoelectronics.liteon.com/upload/download/DS86-2014-0007/LTR-553ALS-01_DS_V1.pdf
 			switch (sub_id) {
 			case 0:
-				return "LTR-553ALS Lux (" + String(s_addr) + ")";
+				return "LTR-553ALS_Lux_(" + String(s_addr) + ")";
 			case 1:
-				return "LTR-553ALS Proximity (" + String(s_addr) + ")";
+				return "LTR-553ALS_Proximity_(" + String(s_addr) + ")";
 			default:
 				return "LTR-553ALS";
 			}
@@ -1742,21 +1884,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ url: https://akizukidenshi.com/catalog/g/g109486/
 			switch (sub_id) {
 			case 0:
-				return "MCP23017 GPIO_A (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_A_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP23017 GPIO_B (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_B_(" + String(s_addr) + ")";
 			default:
 				return "MCP23017";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
-			// MCP23017
+			// PCA9554
+			//@ url: https://www.switch-science.com/products/6552
 			switch (sub_id) {
 			case 0:
-				return "PCA9554 (" + String(s_addr) + ")";
+				return "PCA9554_(" + String(s_addr) + ")";
 			default:
 				return "PCA9554";
 			}
@@ -1764,9 +1908,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
 			// BH1750FVI
+			//@ url: https://www.switch-science.com/products/7985
 			switch (sub_id) {
 			case 0:
-				return "BH1750FVI (" + String(s_addr) + ")";
+				return "BH1750FVI_(" + String(s_addr) + ")";
 			default:
 				return "BH1750FVI";
 			}
@@ -1776,21 +1921,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x25:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ url: https://akizukidenshi.com/catalog/g/g109486/
 			switch (sub_id) {
 			case 0:
-				return "MCP23017 GPIO_A (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_A_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP23017 GPIO_B (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_B_(" + String(s_addr) + ")";
 			default:
 				return "MCP23017";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
-			// MCP23017
+			// PCA9554
+			//@ url: https://www.switch-science.com/products/6552
 			switch (sub_id) {
 			case 0:
-				return "PCA9554 (" + String(s_addr) + ")";
+				return "PCA9554_(" + String(s_addr) + ")";
 			default:
 				return "PCA9554";
 			}
@@ -1799,11 +1946,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x26:
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_weight) {
 			// M5 Weight I2C Unit
+			//@ url: https://www.switch-science.com/products/9568
 			switch (sub_id) {
 			case 0:
-				return "M5_Weight_Unit (" + String(s_addr) + ")";
+				return "M5_Weight_Unit_(" + String(s_addr) + ")";
 			case 1:
-				return "M5_Weight_Unit ADC (" + String(s_addr) + ")";
+				return "M5_Weight_Unit_ADC_(" + String(s_addr) + ")";
 			default:
 				return "M5_Weight_Unit";
 			}
@@ -1811,21 +1959,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ url: https://akizukidenshi.com/catalog/g/g109486/
 			switch (sub_id) {
 			case 0:
-				return "MCP23017 GPIO_A (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_A_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP23017 GPIO_B (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_B_(" + String(s_addr) + ")";
 			default:
 				return "MCP23017";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
-			// MCP23017
+			// PCA9554
+			//@ url: https://www.switch-science.com/products/6552
 			switch (sub_id) {
 			case 0:
-				return "PCA9554 (" + String(s_addr) + ")";
+				return "PCA9554_(" + String(s_addr) + ")";
 			default:
 				return "PCA9554";
 			}
@@ -1834,21 +1984,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x27:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ url: https://akizukidenshi.com/catalog/g/g109486/
 			switch (sub_id) {
 			case 0:
-				return "MCP23017 GPIO_A (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_A_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP23017 GPIO_B (" + String(s_addr) + ")";
+				return "MCP23017_GPIO_B_(" + String(s_addr) + ")";
 			default:
 				return "MCP23017";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
-			// MCP23017
+			// PCA9554
+			//@ url: https://www.switch-science.com/products/6552
 			switch (sub_id) {
 			case 0:
-				return "PCA9554 (" + String(s_addr) + ")";
+				return "PCA9554_(" + String(s_addr) + ")";
 			default:
 				return "PCA9554";
 			}
@@ -1857,11 +2009,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x28:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mfrc522) {
 			// RFID Unit
+			//@ url: https://shop.m5stack.com/products/rfid-sensor-unit?variant=16804784701530
 			switch (sub_id) {
 			case 0:
-				return "MFRC522 (" + String(s_addr) + ")";
+				return "MFRC522_(" + String(s_addr) + ")";
 			case 1:
-				return "MFRC522 Old (" + String(s_addr) + ")";
+				return "MFRC522_Old_(" + String(s_addr) + ")";
 			default:
 				return "MFRC522";
 			}
@@ -1869,32 +2022,46 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x29:
 		if (i2c_sensors[port][address][bus_channel][sub_address].vl53l0x) {
+			//@ url: https://www.switch-science.com/products/5219
 			switch (sub_id) {
 			case 0:
-				return "VL53L0X (" + String(s_addr) + ")";
+				return "VL53L0X_(" + String(s_addr) + ")";
 			default:
 				return "VL53L0X";
 			}
 		}
-		if (i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
-			// Color Unit
+
+		if (i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
+			//@ url: https://www.switch-science.com/products/9427
 			switch (sub_id) {
 			case 0:
-				return "TCS34725 (" + String(s_addr) + ")";
+				return "VL53L1X_(" + String(s_addr) + ")";
+			default:
+				return "VL53L1X";
+			}
+		}
+
+		if (i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
+			// Color Unit
+			//@ url: https://www.switch-science.com/products/5218
+			switch (sub_id) {
+			case 0:
+				return "TCS34725_(" + String(s_addr) + ")";
 			case 1:
-				return "TCS34725_R (" + String(s_addr) + ")";
+				return "TCS34725_R_(" + String(s_addr) + ")";
 			case 2:
-				return "TCS34725_G (" + String(s_addr) + ")";
+				return "TCS34725_G_(" + String(s_addr) + ")";
 			case 3:
-				return "TCS34725_B (" + String(s_addr) + ")";
+				return "TCS34725_B_(" + String(s_addr) + ")";
 			default:
 				return "TCS34725";
 			}
 		}
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ url: https://www.switch-science.com/products/1174
 			switch (sub_id) {
 			case 0:
-				return "TLS2561 (" + String(s_addr) + ")";
+				return "TLS2561_(" + String(s_addr) + ")";
 			default:
 				return "TLS2561";
 			}
@@ -1903,11 +2070,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x38:
 		if (i2c_sensors[port][address][bus_channel][sub_address].ahtxx) {
 			// AHT10, AHT20
+			//@ url: https://www.switch-science.com/products/8600
 			switch (sub_id) {
 			case 0:
-				return "AHTxx Humid (" + String(s_addr) + ")";
+				return "AHTxx_Humid_(" + String(s_addr) + ")";
 			case 1:
-				return "AHTxx Temp (" + String(s_addr) + ")";
+				return "AHTxx_Temp_(" + String(s_addr) + ")";
 			default:
 				return "AHTxx";
 			}
@@ -1915,9 +2083,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x39:
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ url: https://www.switch-science.com/products/1174
 			switch (sub_id) {
 			case 0:
-				return "TLS2561 (" + String(s_addr) + ")";
+				return "TLS2561_(" + String(s_addr) + ")";
 			default:
 				return "TLS2561";
 			}
@@ -1927,77 +2096,69 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		// LCD device
 		return "AQM0802A";
 	case 0x40:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485) {
-			// DS18XXX over DS2485
-			uint8_t ow_addr[8]     = {0};
-			const uint8_t DS18S20  = 0x10; // also DS1820
-			const uint8_t DS18B20  = 0x28; // also MAX31820
-			const uint8_t DS1822   = 0x22;
-			const uint8_t DS1825   = 0x3B;
-			const uint8_t DS28EA00 = 0x42;
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
+			// DS248X: 1-Wire to I2C bridge
 
-			if (0 <= sub_id) {
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->setTargetDevice(sub_id);
-				i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getTargetDeviceAddress(ow_addr);
-
-				char ow_addr_str[128] = {0};
-				snprintf(ow_addr_str, 128, " [%02X%02X%02X%02X%02X%02X%02X%02X]",
-				         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-
-				switch (ow_addr[0]) {
-				case DS18S20:
-					return "DS18S20" + String(ow_addr_str);
-				case DS18B20:
-					return "DS18B20" + String(ow_addr_str);
-				case DS1822:
-					return "DS1822" + String(ow_addr_str);
-				case DS1825:
-					return "DS1825" + String(ow_addr_str);
-				case DS28EA00:
-					return "DS28EA00" + String(ow_addr_str);
-				default:
-					break;
-				}
-			} else {
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getOneWireDeviceNum();
-				return "DS2485 (" + String(num) + " nodes)";
+			// sub_id < 0 の場合、DS2485 全体の情報を返す
+			if (sub_id < 0) {
+				auto total_nodes = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceCount();
+				return "DS2485_(" + String(total_nodes) + "-nodes)";
 			}
-		}
 
-		if (i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485) {
-			// MAX3185 over DS2485
-			uint8_t ow_addr[8] = {0};
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceValueId(sub_id);
+			char ow_addr_str[128]  = {0};
+			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
-			if (0 <= sub_id) {
-				uint8_t idx = (sub_id % 2 == 0) ? (sub_id / 2) : ((sub_id - 1) / 2);
-
-				i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->setTargetDevice(idx);
-				i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getTargetDeviceAddress(ow_addr);
-
-				char ow_addr_str[128] = {0};
-				snprintf(ow_addr_str, 128, " [%02X%02X%02X%02X%02X%02X%02X%02X]",
-				         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
-
-				if (sub_id % 2 == 0) {
-					return "MAX3185 Temp_Junc" + String(ow_addr_str);
-				} else {
-					return "MAX3185 Temp_Cold" + String(ow_addr_str);
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
+				// DS18XXX センサー
+				//@ key: DS18B20
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://strawberry-linux.com/catalog/items?code=12331
+				//@ url: https://www.switch-science.com/products/8650
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
 				}
-			} else {
-				uint16_t num = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getOneWireDeviceNum();
-				return "MAX3185 (" + String(num) + " nodes)";
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
+				// MAX3185 センサー
+				//@ key: MAX31850K
+				//@ note: DS2482, DS2485, 等の 1-wire=I2C 変換 IC が必要です。
+				//@ url: https://www.switch-science.com/products/4102
+				//@ url: https://www.switch-science.com/products/8650
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->setTargetDevice(ow_addr) == true) {
+					String pname = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getFamilyName(ow_addr[0]);
+					switch (value_id) {
+					case 0:
+						return pname + "_Temp_Junc" + String(ow_addr_str);
+					case 1:
+						return pname + "_Temp_Cold" + String(ow_addr_str);
+					default:
+						return pname + String(ow_addr_str);
+					}
+				}
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].sns2) {
 			// ATMICL-ONE
+			//@ url: https://booth.pm/ja/items/2307810
 			switch (sub_id) {
 			case 0:
-				return "SNS2 State (" + String(s_addr) + ")";
+				return "SNS2_State_(" + String(s_addr) + ")";
 			case 1:
-				return "SNS2 Count (" + String(s_addr) + ")";
+				return "SNS2_Count_(" + String(s_addr) + ")";
 			case 2:
-				return "SNS2 Frequency (" + String(s_addr) + ")";
+				return "SNS2_Frequency_(" + String(s_addr) + ")";
 			default:
 				return "SNS2";
 			}
@@ -2006,11 +2167,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x44:
 		if (i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
 			// SHT4X
+			//@ url: https://www.switch-science.com/products/9270
 			switch (sub_id) {
 			case 0:
-				return "SHT4X Humid (" + String(s_addr) + ")";
+				return "SHT4X_Humid_(" + String(s_addr) + ")";
 			case 1:
-				return "SHT4X Temp (" + String(s_addr) + ")";
+				return "SHT4X_Temp_(" + String(s_addr) + ")";
 			default:
 				return "SHT4X";
 			}
@@ -2018,11 +2180,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
 			// SHT3X
+			//@ url: https://www.switch-science.com/products/7254
 			switch (sub_id) {
 			case 0:
-				return "SHT3X Humid (" + String(s_addr) + ")";
+				return "SHT3X_Humid_(" + String(s_addr) + ")";
 			case 1:
-				return "SHT3X Temp (" + String(s_addr) + ")";
+				return "SHT3X_Temp_(" + String(s_addr) + ")";
 			default:
 				return "SHT3X";
 			}
@@ -2031,9 +2194,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x45:
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_extio2) {
 			// M5 ExtI/O 2
+			//@ url: https://www.switch-science.com/products/8187
 			switch (sub_id) {
 			case 0:
-				return "M5_EXT_IO2 (" + String(s_addr) + ")";
+				return "M5_EXT_IO2_(" + String(s_addr) + ")";
 			default:
 				return "M5_EXT_IO2";
 			}
@@ -2041,11 +2205,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].sht4x) {
 			// SHT4X
+			//@ url: https://www.switch-science.com/products/9270
 			switch (sub_id) {
 			case 0:
-				return "SHT4X Humid (" + String(s_addr) + ")";
+				return "SHT4X_Humid_(" + String(s_addr) + ")";
 			case 1:
-				return "SHT4X Temp (" + String(s_addr) + ")";
+				return "SHT4X_Temp_(" + String(s_addr) + ")";
 			default:
 				return "SHT4X";
 			}
@@ -2053,11 +2218,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].sht3x) {
 			// SHT3X
+			//@ url: https://www.switch-science.com/products/7254
 			switch (sub_id) {
 			case 0:
-				return "SHT3X Humid (" + String(s_addr) + ")";
+				return "SHT3X_Humid_(" + String(s_addr) + ")";
 			case 1:
-				return "SHT3X Temp (" + String(s_addr) + ")";
+				return "SHT3X_Temp_(" + String(s_addr) + ")";
 			default:
 				return "SHT3X";
 			}
@@ -2066,15 +2232,16 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x48:
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
+			//@ url: https://www.switch-science.com/products/4430
 			switch (sub_id) {
 			case 0:
-				return "ADS1115 ch0 (" + String(s_addr) + ")";
+				return "ADS1115_ch0_(" + String(s_addr) + ")";
 			case 1:
-				return "ADS1115 ch1 (" + String(s_addr) + ")";
+				return "ADS1115_ch1_(" + String(s_addr) + ")";
 			case 2:
-				return "ADS1115 ch2 (" + String(s_addr) + ")";
+				return "ADS1115_ch2_(" + String(s_addr) + ")";
 			case 3:
-				return "ADS1115 ch3 (" + String(s_addr) + ")";
+				return "ADS1115_ch3_(" + String(s_addr) + ")";
 
 			default:
 				return "ADS1115";
@@ -2083,11 +2250,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1100) {
 			// ADC Unit
+			//@ url: https://www.switch-science.com/products/5221
 			switch (sub_id) {
 			case 0:
-				return "ADS1100 (" + String(s_addr) + ")";
+				return "ADS1100_(" + String(s_addr) + ")";
 			case 1:
-				return "ADS1100 M5_Unit (" + String(s_addr) + ")";
+				return "ADS1100_M5_Unit_(" + String(s_addr) + ")";
 			default:
 				return "ADS1100";
 			}
@@ -2095,9 +2263,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x49:
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ url: https://www.switch-science.com/products/1174
 			switch (sub_id) {
 			case 0:
-				return "TLS2561 (" + String(s_addr) + ")";
+				return "TLS2561_(" + String(s_addr) + ")";
 			default:
 				return "TLS2561";
 			}
@@ -2105,15 +2274,16 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
+			//@ url: https://www.switch-science.com/products/4430
 			switch (sub_id) {
 			case 0:
-				return "ADS1115 ch0 (" + String(s_addr) + ")";
+				return "ADS1115_ch0_(" + String(s_addr) + ")";
 			case 1:
-				return "ADS1115 ch1 (" + String(s_addr) + ")";
+				return "ADS1115_ch1_(" + String(s_addr) + ")";
 			case 2:
-				return "ADS1115 ch2 (" + String(s_addr) + ")";
+				return "ADS1115_ch2_(" + String(s_addr) + ")";
 			case 3:
-				return "ADS1115 ch3 (" + String(s_addr) + ")";
+				return "ADS1115_ch3_(" + String(s_addr) + ")";
 
 			default:
 				return "ADS1115";
@@ -2122,9 +2292,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x4D:
 		if (i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx) {
+			//@ note: UART=I2C 変換基板で I2C に対応させている
+			//@ url: https://www.switch-science.com/products/6027
+			//@ url: https://www.mouser.jp/new/dfrobot/dfrobot-a02yyuw-ultrasonic-sensor/
 			switch (sub_id) {
 			case 0:
-				return "SC16IS7XX-A02YYUW (" + String(s_addr) + ")";
+				return "SC16IS7XX-A02YYUW_(" + String(s_addr) + ")";
 			default:
 				return "SC16IS7XX-A02YYUW";
 			}
@@ -2133,33 +2306,50 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x50:
 		if (i2c_sensors[port][address][bus_channel][sub_address].ands) {
 			// ATMICL ONE ANDS
+			//@ url: https://booth.pm/ja/items/2307810
 			switch (sub_id) {
 			case 0:
-				return "ANDS Current (" + String(s_addr) + ")";
+				return "ANDS_Current_(" + String(s_addr) + ")";
 			case 1:
-				return "ANDS Frequency (" + String(s_addr) + ")";
+				return "ANDS_Frequency_(" + String(s_addr) + ")";
 			default:
 				return "ANDS";
 			}
 		}
 		break;
 	case 0x51:
-		if (i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter) {
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
 			// M5 Ampere meter unit
+			//@ note: ADS1115との併用不可
+			//@ url: https://www.switch-science.com/products/6739
 			switch (sub_id) {
 			case 0:
-				return "M5AMeter (" + String(s_addr) + ")";
+				return "M5AMeter_(" + String(s_addr) + ")";
 			default:
 				return "M5AMeter";
+			}
+		}
+		break;
+	case 0x53:
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
+			// M5 Volt meter unit
+			//@ note: ADS1115との併用不可
+			//@ url: https://www.switch-science.com/products/6740
+			switch (sub_id) {
+			case 0:
+				return "M5VMeter_(" + String(s_addr) + ")";
+			default:
+				return "M5VMeter";
 			}
 		}
 		break;
 	case 0x55:
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_4_20mA_unit) {
 			// M5 4-20mA Unit
+			//@ url: https://www.switch-science.com/products/9126
 			switch (sub_id) {
 			case 0:
-				return "M5_4-20mA_Unit (" + String(s_addr) + ")";
+				return "M5_4-20mA_Unit_(" + String(s_addr) + ")";
 			default:
 				return "M5_4-20mA_Unit";
 			}
@@ -2167,11 +2357,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x56:
 		if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
+			//@ url: https://www.switch-science.com/products/7254
 			switch (sub_id) {
 			case 0:
-				return "QMP6988 Pressure (" + String(s_addr) + ")";
+				return "QMP6988_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "QMP6988 Temp (" + String(s_addr) + ")";
+				return "QMP6988_Temp_(" + String(s_addr) + ")";
 			default:
 				return "QMP6988";
 			}
@@ -2180,9 +2371,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x57:
 		if (i2c_sensors[port][address][bus_channel][sub_address].rcwl9620) {
 			// RCWL-9620 -- ultra sonic distance sensor
+			//@ url: https://www.switch-science.com/products/7631
 			switch (sub_id) {
 			case 0:
-				return "RCWL-9620 (" + String(s_addr) + ")";
+				return "RCWL-9620_(" + String(s_addr) + ")";
 			default:
 				return "RCWL-9620";
 			}
@@ -2190,11 +2382,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x58:
 		if (i2c_sensors[port][address][bus_channel][sub_address].sgp30) {
+			//@ url: https://www.switch-science.com/products/6619
 			switch (sub_id) {
 			case 0:
-				return "SGP30 TVOC (" + String(s_addr) + ")";
+				return "SGP30_TVOC_(" + String(s_addr) + ")";
 			case 1:
-				return "SGP30 eCO2 (" + String(s_addr) + ")";
+				return "SGP30_eCO2_(" + String(s_addr) + ")";
 			default:
 				return "SGP30";
 			}
@@ -2202,11 +2395,12 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].an16) {
 			// ATMICL ONE ANDS
+			//@ url: https://booth.pm/ja/items/2307810
 			switch (sub_id) {
 			case 0:
-				return "AN16 Current (" + String(s_addr) + ")";
+				return "AN16_Current_(" + String(s_addr) + ")";
 			case 1:
-				return "AN16 Frequency (" + String(s_addr) + ")";
+				return "AN16_Frequency_(" + String(s_addr) + ")";
 			default:
 				return "AN16";
 			}
@@ -2218,9 +2412,10 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x5C:
 		if (i2c_sensors[port][address][bus_channel][sub_address].bh1750fvi) {
 			// BH1750FVI
+			//@ url: https://www.switch-science.com/products/7985
 			switch (sub_id) {
 			case 0:
-				return "BH1750FVI (" + String(s_addr) + ")";
+				return "BH1750FVI_(" + String(s_addr) + ")";
 			default:
 				return "BH1750FVI";
 			}
@@ -2229,13 +2424,15 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x60:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp9600) {
 			// MCP9600
+			//@ note: K型熱電対のみ対応
+			//@ url: https://www.switch-science.com/products/5345
 			switch (sub_id) {
 			case 0:
-				return "MCP9600 Temp_Junc (" + String(s_addr) + ")";
+				return "MCP9600_Temp_Junc_(" + String(s_addr) + ")";
 			case 1:
-				return "MCP9600 Temp_Cold (" + String(s_addr) + ")";
+				return "MCP9600_Temp_Cold_(" + String(s_addr) + ")";
 			case 2:
-				return "MCP9600 Temp_Delta (" + String(s_addr) + ")";
+				return "MCP9600_Temp_Delta_(" + String(s_addr) + ")";
 			default:
 				return "MCP9600";
 			}
@@ -2243,24 +2440,26 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x61:
 		if (i2c_sensors[port][address][bus_channel][sub_address].scd30) {
+			//@url：https://www.switch-science.com/products/7000
 			switch (sub_id) {
 			case 0:
-				return "SCD30 CO2 (" + String(s_addr) + ")";
+				return "SCD30_CO2_(" + String(s_addr) + ")";
 			case 1:
-				return "SCD30 Temp (" + String(s_addr) + ")";
+				return "SCD30_Temp_(" + String(s_addr) + ")";
 			case 2:
-				return "SCD30 Humid (" + String(s_addr) + ")";
+				return "SCD30_Humid_(" + String(s_addr) + ")";
 			default:
 				return "SCD30";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].ezo_do) {
+			//@ url: https://atlas-scientific.com/embedded-solutions/ezo-dissolved-oxygen-circuit/
 			switch (sub_id) {
 			case 0:
-				return "EZO-DO (" + String(s_addr) + ")";
+				return "EZO-DO_(" + String(s_addr) + ")";
 			case 1:
-				return "EZO-DO Saturation (" + String(s_addr) + ")";
+				return "EZO-DO_Saturation_(" + String(s_addr) + ")";
 			default:
 				return "EZO-DO";
 			}
@@ -2269,13 +2468,15 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x62:
 		if (i2c_sensors[port][address][bus_channel][sub_address].scd4x) {
 			// SCD4x
+			//@ url: https://www.switch-science.com/products/8496
+			//@ url: https://www.switch-science.com/products/8668
 			switch (sub_id) {
 			case 0:
-				return "SCD4x CO2 (" + String(s_addr) + ")";
+				return "SCD4x_CO2_(" + String(s_addr) + ")";
 			case 1:
-				return "SCD4x Temp (" + String(s_addr) + ")";
+				return "SCD4x_Temp_(" + String(s_addr) + ")";
 			case 2:
-				return "SCD4x Humid (" + String(s_addr) + ")";
+				return "SCD4x_Humid_(" + String(s_addr) + ")";
 			default:
 				return "SCD4x";
 			}
@@ -2283,22 +2484,24 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x66:
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter) {
+			//@ url: https://www.switch-science.com/products/7655
 			switch (sub_id) {
 			case 0:
-				return "M5_KMeter Temp (" + String(s_addr) + ")";
+				return "M5_KMeter_Temp_(" + String(s_addr) + ")";
 			case 1:
-				return "M5_KMeter Unit_Temp (" + String(s_addr) + ")";
+				return "M5_KMeter_Unit_Temp_(" + String(s_addr) + ")";
 			default:
 				return "M5_KMeter";
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso) {
+			//@ url: https://www.switch-science.com/products/9007
 			switch (sub_id) {
 			case 0:
-				return "M5_KMeter_ISO Temp (" + String(s_addr) + ")";
+				return "M5_KMeter_ISO_Temp_(" + String(s_addr) + ")";
 			case 1:
-				return "M5_KMeter_ISO Internal_Temp (" + String(s_addr) + ")";
+				return "M5_KMeter_ISO_Internal_Temp_(" + String(s_addr) + ")";
 			default:
 				return "M5_KMeter_ISO";
 			}
@@ -2309,21 +2512,22 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		return "MPU6886";
 	case 0x69:
 		if (i2c_sensors[port][address][bus_channel][sub_address].sen54) {
+			//@ url: https://www.switch-science.com/products/8405
 			switch (sub_id) {
 			case 0:
-				return "SEN54 PM1.0 (" + String(s_addr) + ")";
+				return "SEN54_PM1.0_(" + String(s_addr) + ")";
 			case 1:
-				return "SEN54 PM2.5 (" + String(s_addr) + ")";
+				return "SEN54_PM2.5_(" + String(s_addr) + ")";
 			case 2:
-				return "SEN54 PM4.0 (" + String(s_addr) + ")";
+				return "SEN54_PM4.0_(" + String(s_addr) + ")";
 			case 3:
-				return "SEN54 PM10 (" + String(s_addr) + ")";
+				return "SEN54_PM10_(" + String(s_addr) + ")";
 			case 4:
-				return "SEN54 Humid (" + String(s_addr) + ")";
+				return "SEN54_Humid_(" + String(s_addr) + ")";
 			case 5:
-				return "SEN54 Temp (" + String(s_addr) + ")";
+				return "SEN54_Temp_(" + String(s_addr) + ")";
 			case 6:
-				return "SEN54 VOC (" + String(s_addr) + ")";
+				return "SEN54_VOC_(" + String(s_addr) + ")";
 			default:
 				return "SEN54";
 			}
@@ -2334,19 +2538,24 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		return "SY6970";
 	case 0x70:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
+			//@ url: https://www.switch-science.com/products/5698
+			//@ url: https://www.switch-science.com/products/7588
+			//@ url: https://www.switch-science.com/products/10192
+			//@ note: I2C マルチプレクサ
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A " + String(bus_channel) + "ch) " + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
+			//@ url: https://www.switch-science.com/products/7254
 			switch (sub_id) {
 			case 0:
-				return "QMP6988 Pressure (" + String(s_addr) + ")";
+				return "QMP6988_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "QMP6988 Temp (" + String(s_addr) + ")";
+				return "QMP6988_Temp_(" + String(s_addr) + ")";
 			default:
 				return "QMP6988";
 			}
@@ -2358,10 +2567,14 @@ String I2C_Manager::getDeviceName(uint8_t port,
 	case 0x74:
 	case 0x75:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
+			//@ url: https://www.switch-science.com/products/5698
+			//@ url: https://www.switch-science.com/products/7588
+			//@ url: https://www.switch-science.com/products/10192
+			//@ note: I2C マルチプレクサ
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A " + String(bus_channel) + "ch) " + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
@@ -2373,20 +2586,25 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x76:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
+			//@ url: https://www.switch-science.com/products/5698
+			//@ url: https://www.switch-science.com/products/7588
+			//@ url: https://www.switch-science.com/products/10192
+			//@ note: I2C マルチプレクサ
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A " + String(bus_channel) + "ch) " + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
 			// BMP280
+			//@ url: https://www.switch-science.com/products/3373
 			switch (sub_id) {
 			case 0:
-				return "BMP280 Pressure (" + String(s_addr) + ")";
+				return "BMP280_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "BMP280 Temp (" + String(s_addr) + ")";
+				return "BMP280_Temp_(" + String(s_addr) + ")";
 			default:
 				return "BMP280";
 			}
@@ -2394,13 +2612,14 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bme280) {
 			// BME280 -- Digital Temp/Humid/Pressure sensor
+			//@ url: https://www.switch-science.com/products/2236
 			switch (sub_id) {
 			case 0:
-				return "BME280 Pressure (" + String(s_addr) + ")";
+				return "BME280_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "BME280 Temp (" + String(s_addr) + ")";
+				return "BME280_Temp_(" + String(s_addr) + ")";
 			case 2:
-				return "BME280 Humid (" + String(s_addr) + ")";
+				return "BME280_Humid_(" + String(s_addr) + ")";
 			default:
 				return "BME280";
 			}
@@ -2408,20 +2627,25 @@ String I2C_Manager::getDeviceName(uint8_t port,
 		break;
 	case 0x77:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
+			//@ url: https://www.switch-science.com/products/5698
+			//@ url: https://www.switch-science.com/products/7588
+			//@ url: https://www.switch-science.com/products/10192
+			//@ note: I2C マルチプレクサ
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A " + String(bus_channel) + "ch) " + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bmp280) {
 			// BMP280
+			//@ url: https://www.switch-science.com/products/3373
 			switch (sub_id) {
 			case 0:
-				return "BMP280 Pressure (" + String(s_addr) + ")";
+				return "BMP280_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "BMP280 Temp (" + String(s_addr) + ")";
+				return "BMP280_Temp_(" + String(s_addr) + ")";
 			default:
 				return "BMP280";
 			}
@@ -2429,13 +2653,14 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bme280) {
 			// BME280 -- Digital Temp/Humid/Pressure sensor
+			//@ url: https://www.switch-science.com/products/2236
 			switch (sub_id) {
 			case 0:
-				return "BME280 Pressure (" + String(s_addr) + ")";
+				return "BME280_Pressure_(" + String(s_addr) + ")";
 			case 1:
-				return "BME280 Temp (" + String(s_addr) + ")";
+				return "BME280_Temp_(" + String(s_addr) + ")";
 			case 2:
-				return "BME280 Humid (" + String(s_addr) + ")";
+				return "BME280_Humid_(" + String(s_addr) + ")";
 			default:
 				return "BME280";
 			}
@@ -2443,15 +2668,16 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
 			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
+			//@ url: https://www.switch-science.com/products/9274
 			switch (sub_id) {
 			case 0:
-				return "BME68x Temp (" + String(s_addr) + ")";
+				return "BME68x_Temp_(" + String(s_addr) + ")";
 			case 1:
-				return "BME68x Humid (" + String(s_addr) + ")";
+				return "BME68x_Humid_(" + String(s_addr) + ")";
 			case 2:
-				return "BME68x Pressure (" + String(s_addr) + ")";
+				return "BME68x_Pressure_(" + String(s_addr) + ")";
 			case 3:
-				return "BME68x Gas_Registance (" + String(s_addr) + ")";
+				return "BME68x_Gas_Registance_(" + String(s_addr) + ")";
 			default:
 				return "BME68x";
 			}
@@ -2459,14 +2685,19 @@ String I2C_Manager::getDeviceName(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].gwls) {
 			// Grove water level sensor
-			return "WaterLevelSensor (" + String(s_addr) + ")";
-			;
+			//@ url: https://www.switch-science.com/products/6282
+			switch (sub_id) {
+			case 0:
+				return "WaterLevelSensor_(" + String(s_addr) + ")";
+			default:
+				return "WaterLevelSensor";
+			}
 		}
 		break;
 	default:
 		break;
 	}
-	return "Unknown device";
+	return "Unknown_device";
 }
 
 // MARK: getDeviceUnit
@@ -2494,6 +2725,7 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// flexible thermistor
 			switch (sub_id) {
 			case 0:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2501,15 +2733,79 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		}
 		break;
 	case 0x18:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			return "\'C";
+		// DS248X: DS18XXX と MAX3185 の両方とも温度センサー
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
+
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					case 1:
+						//@ label: 冷接点温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
 		}
 		break;
 	case 0x19:
 	case 0x1A:
 	case 0x1B:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			return "\'C";
+		// DS248X: DS18XXX と MAX3185 の両方とも温度センサー
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
+
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					case 1:
+						//@ label: 冷接点温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
 		}
 		break;
 	case 0x20:
@@ -2517,11 +2813,15 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 	case 0x22:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 		break;
@@ -2530,8 +2830,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// LTR_553ALS
 			switch (sub_id) {
 			case 0:
+				//@ label: 照度
 				return "lux";
 			case 1:
+				//@ label: 近接判定
 				return "";
 			default:
 				return "";
@@ -2540,11 +2842,15 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
@@ -2552,6 +2858,7 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BH1750FVI
 			switch (sub_id) {
 			case 0:
+				//@ label: 照度
 				return "lux";
 			default:
 				return "";
@@ -2562,11 +2869,15 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 	case 0x25:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 		break;
@@ -2575,8 +2886,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// M5 Weight I2C Unit
 			switch (sub_id) {
 			case 0:
+				//@ label: 重量（推定値）
 				return "g";
 			case 1:
+				//@ label: 重量（AD 値）
 				return "";
 			default:
 				return "";
@@ -2584,51 +2897,73 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		}
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 		break;
 	case 0x27:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mcp23017) {
 			// MCP23017
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].pca9554) {
 			// PCA9554
+			//@ label: 電圧値（デジタル）
+			//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 			return "";
 		}
 		break;
 	case 0x28:
 		if (i2c_sensors[port][address][bus_channel][sub_address].mfrc522) {
 			// RFID Unit
+			//@ label: RFID の ID 値
 			return "";
 		}
 		break;
 	case 0x29:
 		if (i2c_sensors[port][address][bus_channel][sub_address].vl53l0x) {
+			//@ label: 距離
 			return "mm";
 		}
+
+		if (i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
+			//@ label: 距離
+			return "mm";
+		}
+
 		if (i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
 			// Color Unit
 			switch (sub_id) {
 			case 0:
+				//@ label: RGB 強度（RRGGBB）
 				return "RGB";
 			case 1:
+				//@ label: 赤色強度（0-255）
 				return "R";
 			case 2:
+				//@ label: 緑色強度（0-255）
 				return "G";
 			case 3:
+				//@ label: 青色強度（0-255）
 				return "B";
 			default:
 				return "";
 			}
 		}
+
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ label: 照度
 			return "lux";
 		}
 		break;
@@ -2637,8 +2972,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// AHT10, AHT20
 			switch (sub_id) {
 			case 0:
+				//@ label: 相対湿度
 				return "%RH";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2647,28 +2984,58 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		break;
 	case 0x39:
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ label: 照度
 			return "lux";
 		}
 		break;
 	case 0x40:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485) {
-			// DS18B20 over DS2485
-			return "\'C";
-		}
+		// DS2485: DS18XXX と MAX3185 の両方とも温度センサー
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceValueId(sub_id);
 
-		if (i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485) {
-			// MAX3185 over DS2485
-			return "\'C";
+			// センサ名の取得
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						//@ label: 温度
+						return "\'C";
+					case 1:
+						//@ label: 冷接点温度
+						return "\'C";
+					default:
+						return "";
+					}
+				}
+			}
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].sns2) {
 			// ATMICL-ONE
 			switch (sub_id) {
 			case 0:
+				//@ label: 直流電流状態（0/1）
 				return "";
 			case 1:
+				//@ label: パルスカウント値
 				return "";
 			case 2:
+				//@ label: パルス周波数
 				return "Hz";
 			default:
 				return "";
@@ -2680,8 +3047,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// SHT4X
 			switch (sub_id) {
 			case 0:
+				//@ label: 相対湿度
 				return "%RH";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2692,8 +3061,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// SHT3X
 			switch (sub_id) {
 			case 0:
+				//@ label: 相対湿度
 				return "%RH";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2705,6 +3076,8 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// M5 ExtI/O 2
 			switch (sub_id) {
 			case 0:
+				//@ label: 電圧値（デジタル）
+				//@ note: 出力値は各端子のH/Lを各ビットに割り当てた値
 				return "";
 			default:
 				return "";
@@ -2715,8 +3088,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// SHT4X
 			switch (sub_id) {
 			case 0:
+				//@ label: 相対湿度
 				return "%RH";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2727,8 +3102,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// SHT3X
 			switch (sub_id) {
 			case 0:
+				//@ label: 相対湿度
 				return "%RH";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2738,26 +3115,31 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 	case 0x48:
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
+			//@ label: 電圧値（アナログ）
 			return "mV";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1100) {
 			// ADC Unit
+			//@ label: 電圧値（アナログ）
 			return "mV";
 		}
 		break;
 	case 0x49:
 		if (i2c_sensors[port][address][bus_channel][sub_address].tsl2561) {
+			//@ label: 照度
 			return "lux";
 		}
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].ads1115) {
 			// ADC Unit
+			//@ label: 電圧値（アナログ）
 			return "mV";
 		}
 		break;
 	case 0x4D:
 		if (i2c_sensors[port][address][bus_channel][sub_address].sc16is7xx) {
+			//@ label: 距離
 			return "mm";
 		}
 		break;
@@ -2766,8 +3148,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// ATMICL ONE ANDS
 			switch (sub_id) {
 			case 0:
+				//@ label: 交流電流値
 				return "A";
 			case 1:
+				//@ label: 交流周波数
 				return "Hz";
 			default:
 				return "";
@@ -2775,11 +3159,24 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		}
 		break;
 	case 0x51:
-		if (i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter) {
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
 			// M5 Ampere meter unit
 			switch (sub_id) {
 			case 0:
+				//@ label: 直流電流値
 				return "mA";
+			default:
+				return "";
+			}
+		}
+		break;
+	case 0x53:
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
+			// M5 Volt meter unit
+			switch (sub_id) {
+			case 0:
+				//@ label: 直流電圧値
+				return "mV";
 			default:
 				return "";
 			}
@@ -2790,6 +3187,8 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// M5 4-20mA Unit
 			switch (sub_id) {
 			case 0:
+				//@ label: 電流値
+				//@ note: 4-20mA 出力計測用
 				return "mA";
 			default:
 				return "";
@@ -2800,8 +3199,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2811,6 +3212,7 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 	case 0x57:
 		if (i2c_sensors[port][address][bus_channel][sub_address].rcwl9620) {
 			// RCWL-9620 -- ultra sonic distance sensor
+			//@ label: 距離
 			return "mm";
 		}
 		break;
@@ -2818,8 +3220,11 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].sgp30) {
 			switch (sub_id) {
 			case 0:
+				//@ label: TVOC 濃度
 				return "ppb";
 			case 1:
+				//@ label: eCO2 濃度
+				//@ note: CO2 相当の換算値
 				return "ppm";
 			default:
 				return "";
@@ -2830,8 +3235,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// ATMICL ONE AN16
 			switch (sub_id) {
 			case 0:
+				//@ label: 交流電流値
 				return "A";
 			case 1:
+				//@ label: 交流周波数
 				return "Hz";
 			default:
 				return "";
@@ -2843,6 +3250,7 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BH1750FVI
 			switch (sub_id) {
 			case 0:
+				//@ label: 照度
 				return "lux";
 			default:
 				return "";
@@ -2856,9 +3264,12 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			switch (sub_id) {
 			case 0:
 				// Fall Through
+				//@ label: 温度
 			case 1:
 				// Fall Through
+				//@ label: 温度
 			case 2:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2869,10 +3280,13 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].scd30) {
 			switch (sub_id) {
 			case 0:
+				//@ label: CO2 濃度
 				return "ppm";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			case 2:
+				//@ label: 相対湿度
 				return "%RH";
 			default:
 				return "";
@@ -2882,8 +3296,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].ezo_do) {
 			switch (sub_id) {
 			case 0:
+				//@ label: 溶存酸素量
 				return "mg/L";
 			case 1:
+				//@ label: 酸素飽和率
 				return "%";
 			default:
 				return "";
@@ -2894,10 +3310,13 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].scd4x) {
 			switch (sub_id) {
 			case 0:
+				//@ label: CO2 濃度
 				return "ppm";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			case 2:
+				//@ label: 相対湿度
 				return "%RH";
 			default:
 				return "";
@@ -2908,8 +3327,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter) {
 			switch (sub_id) {
 			case 0:
+				//@ label: 温度
 				return "\'C";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2919,8 +3340,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].m5_kmeter_iso) {
 			switch (sub_id) {
 			case 0:
+				//@ label: 温度
 				return "\'C";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2932,18 +3355,25 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].sen54) {
 			switch (sub_id) {
 			case 0:
+				//@ label: PM1.0 濃度
 				return "ug/m^3";
 			case 1:
+				//@ label: PM2.5 濃度
 				return "ug/m^3";
 			case 2:
+				//@ label: PM4.0 濃度
 				return "ug/m^3";
 			case 3:
+				//@ label: PM10 濃度
 				return "ug/m^3";
 			case 4:
+				//@ label: 相対湿度
 				return "%RH";
 			case 5:
+				//@ label: 温度
 				return "\'C";
 			case 6:
+				//@ label: VOC 指標値
 				return "";
 			default:
 				return "";
@@ -2962,8 +3392,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 		if (i2c_sensors[port][address][bus_channel][sub_address].qmp6988) {
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -2996,8 +3428,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BMP280
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -3008,10 +3442,13 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BME280 -- Digital Temp/Humid/Pressure sensor
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			case 2:
+				//@ label: 相対湿度
 				return "%RH";
 			default:
 				return "";
@@ -3032,8 +3469,10 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BMP280
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			default:
 				return "";
@@ -3044,10 +3483,13 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BME280 -- Digital Temp/Humid/Pressure sensor
 			switch (sub_id) {
 			case 0:
+				//@ label: 大気圧
 				return "Pa";
 			case 1:
+				//@ label: 温度
 				return "\'C";
 			case 2:
+				//@ label: 相対湿度
 				return "%RH";
 			default:
 				return "";
@@ -3058,12 +3500,16 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
 			switch (sub_id) {
 			case 0:
+				//@ label: 温度
 				return "\'C";
 			case 1:
+				//@ label: 相対湿度
 				return "%RH";
 			case 2:
+				//@ label: 大気圧
 				return "Pa";
 			case 3:
+				//@ label: 抵抗値（ガス）
 				return "ohm";
 			default:
 				return "";
@@ -3072,6 +3518,7 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 
 		if (i2c_sensors[port][address][bus_channel][sub_address].gwls) {
 			// Grove water level sensor
+			//@ label: 相対水位
 			return "%";
 		}
 		break;
@@ -3140,35 +3587,147 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 		}
 		return I2C_RES_FAILED;
 	case 0x18:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			DS248X dc(_wire, _address); // 初期化時のオブジェクトは破棄されているため、再セットアップが必要
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setOneWire(&dc);
+		// DS248X が初期化されている場合のみデータ取得
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(sub_id);
-			*d_data = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTempC();
-
-			result = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getLastMeasurementResult();
-			if (result == false) {
-				return I2C_RES_FAILED;
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTempC();
+						result  = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getLastMeasurementResult();
+						if (result == false) {
+							return I2C_RES_FAILED;
+						}
+						return I2C_RES_DOUBLE;
+					default:
+						return I2C_RES_FAILED;
+					}
+				}
 			}
-			return I2C_RES_DOUBLE;
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						// 温度
+						result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+						if (result == true) {
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getTempC();
+							return I2C_RES_DOUBLE;
+						}
+						return I2C_RES_FAILED;
+					case 1: {
+						// 冷接点温度
+						if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->checkColdTemperatureUpdated() == false) {
+							// 更新が必要な場合は値を更新
+							result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+							if (result == false) {
+								return I2C_RES_FAILED;
+							}
+						}
+
+						int status = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getCircuitState();
+						switch (status) {
+						case MAX3185::CIRCUIT_OK:
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getColdTempC();
+							return I2C_RES_DOUBLE;
+						case MAX3185::CIRCUIT_SHORT_TO_VDD:
+							HAL.println("Error circuit short to VDD");
+							break;
+						case MAX3185::CIRCUIT_SHORT_TO_GND:
+							HAL.println("Error circuit short to GND");
+							break;
+						case MAX3185::CIRCUIT_OPEN:
+							HAL.println("Error circuit Open");
+							break;
+						default:
+							break;
+						}
+						return I2C_RES_FAILED;
+					}
+					default:
+						return I2C_RES_FAILED;
+					}
+				}
+			}
 		}
 		return I2C_RES_FAILED;
 	case 0x19:
 	case 0x1A:
 	case 0x1B:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x) {
-			DS248X dc(_wire, _address); // 初期化時のオブジェクトは破棄されているため、再セットアップが必要
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setOneWire(&dc);
+		// DS248X が初期化されている場合のみデータ取得
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds248x) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->setTargetDevice(sub_id);
-			*d_data = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getTempC();
-
-			result = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds248x->getLastMeasurementResult();
-			if (result == false) {
-				return I2C_RES_FAILED;
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getTempC();
+						result  = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds248x->getLastMeasurementResult();
+						if (result == false) {
+							return I2C_RES_FAILED;
+						}
+						return I2C_RES_DOUBLE;
+					default:
+						return I2C_RES_FAILED;
+					}
+				}
 			}
-			return I2C_RES_DOUBLE;
+
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						// 温度
+						result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+						if (result == true) {
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getTempC();
+							return I2C_RES_DOUBLE;
+						}
+						return I2C_RES_FAILED;
+					case 1: {
+						// 冷接点温度
+						if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->checkColdTemperatureUpdated() == false) {
+							// 更新が必要な場合は値を更新
+							result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->convertT();
+							if (result == false) {
+								return I2C_RES_FAILED;
+							}
+						}
+
+						int status = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getCircuitState();
+						switch (status) {
+						case MAX3185::CIRCUIT_OK:
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds248x->getColdTempC();
+							return I2C_RES_DOUBLE;
+						case MAX3185::CIRCUIT_SHORT_TO_VDD:
+							HAL.println("Error circuit short to VDD");
+							break;
+						case MAX3185::CIRCUIT_SHORT_TO_GND:
+							HAL.println("Error circuit short to GND");
+							break;
+						case MAX3185::CIRCUIT_OPEN:
+							HAL.println("Error circuit Open");
+							break;
+						default:
+							break;
+						}
+						return I2C_RES_FAILED;
+					}
+					default:
+						return I2C_RES_FAILED;
+					}
+				}
+			}
 		}
 		return I2C_RES_FAILED;
 	case 0x20:
@@ -3441,6 +4000,19 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 			return I2C_RES_INT;
 		}
 
+		if (i2c_sensors[port][address][bus_channel][sub_address].vl53l1x) {
+			// ToF sensor
+			*i_data = i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->readRangeContinuousMillimeters();
+			if (i2c_sensors[port][address][bus_channel][sub_address].vl53l1x->timeoutOccurred()) {
+				return I2C_RES_FAILED;
+			}
+			// if (*i_data >= 8190) {
+			// 	// Out of range error
+			// 	return I2C_RES_FAILED;
+			// }
+			return I2C_RES_INT;
+		}
+
 		if (i2c_sensors[port][address][bus_channel][sub_address].tcs34725) {
 			// Color Unit
 			static uint16_t clear, red, green, blue;
@@ -3528,55 +4100,73 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 		}
 		return I2C_RES_FAILED;
 	case 0x40:
-		if (i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485) {
-			// DS18B20 over DS2485
-			DS2485 dc(_wire, _address); // 初期化時のオブジェクトは破棄されているため、再セットアップが必要
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->setOneWire(&dc);
+		// DS2485 が初期化されている場合のみデータ取得
+		if (i2c_sensors[port][address][bus_channel][sub_address].ds2485) {
+			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceAddress(sub_id);
+			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceValueId(sub_id);
 
-			i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->setTargetDevice(sub_id);
-			*d_data = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getTempC();
-
-			result = i2c_sensors[port][address][bus_channel][sub_address].ds18xxx_ds2485->getLastMeasurementResult();
-			if (result == false) {
-				return I2C_RES_FAILED;
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485) {
+				// DS18XXX センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getTempC();
+						result  = i2c_sensors[port][address][bus_channel][sub_address].ow_ds18xxx_ds2485->getLastMeasurementResult();
+						if (result == false) {
+							return I2C_RES_FAILED;
+						}
+						return I2C_RES_DOUBLE;
+					default:
+						return I2C_RES_FAILED;
+					}
+				}
 			}
-			return I2C_RES_DOUBLE;
-		}
 
-		if (i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485) {
-			// MAX3185 over DS2485
-			DS2485 dc(_wire, _address); // 初期化時のオブジェクトは破棄されているため、再セットアップが必要
-			i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->setOneWire(&dc);
+			if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485) {
+				// MAX3185 センサー
+				if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->setTargetDevice(ow_addr) == true) {
+					switch (value_id) {
+					case 0:
+						// 温度
+						result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->convertT();
+						if (result == true) {
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getTempC();
+							return I2C_RES_DOUBLE;
+						}
+						return I2C_RES_FAILED;
+					case 1: {
+						// 冷接点温度
+						if (i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->checkColdTemperatureUpdated() == false) {
+							// 更新が必要な場合は値を更新
+							result = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->convertT();
+							if (result == false) {
+								return I2C_RES_FAILED;
+							}
+						}
 
-			uint8_t idx = (sub_id % 2 == 0) ? (sub_id / 2) : ((sub_id - 1) / 2);
-			i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->setTargetDevice(idx);
-
-			if (sub_id % 2 == 0) {
-				result = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->convertT();
-				if (result) {
-					*d_data = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getTempC();
-					return I2C_RES_DOUBLE;
+						int status = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getCircuitState();
+						switch (status) {
+						case MAX3185::CIRCUIT_OK:
+							*d_data = i2c_sensors[port][address][bus_channel][sub_address].ow_max3185_ds2485->getColdTempC();
+							return I2C_RES_DOUBLE;
+						case MAX3185::CIRCUIT_SHORT_TO_VDD:
+							HAL.println("Error circuit short to VDD");
+							break;
+						case MAX3185::CIRCUIT_SHORT_TO_GND:
+							HAL.println("Error circuit short to GND");
+							break;
+						case MAX3185::CIRCUIT_OPEN:
+							HAL.println("Error circuit Open");
+							break;
+						default:
+							break;
+						}
+						return I2C_RES_FAILED;
+					}
+					default:
+						return I2C_RES_FAILED;
+					}
 				}
-				return I2C_RES_FAILED;
-			} else {
-				int status = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getCircuitState();
-				switch (status) {
-				case MAX3185::CIRCUIT_OK:
-					*d_data = i2c_sensors[port][address][bus_channel][sub_address].max3185_ds2485->getColdTempC();
-					return I2C_RES_DOUBLE;
-				case MAX3185::CIRCUIT_SHORT_TO_VDD:
-					HAL.println("Error circuit short to VDD");
-					break;
-				case MAX3185::CIRCUIT_SHORT_TO_GND:
-					HAL.println("Error circuit short to GND");
-					break;
-				case MAX3185::CIRCUIT_OPEN:
-					HAL.println("Error circuit Open");
-					break;
-				default:
-					break;	
-				}
-				return I2C_RES_FAILED;
 			}
 		}
 
@@ -3855,7 +4445,7 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 		}
 		return I2C_RES_FAILED;
 	case 0x51:
-		if (i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter) {
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter) {
 			// M5 Ampere meter unit
 			uint8_t root_address = (address == 0x51) ? 0x48 : address; // 0x51 以外の時はマルチプレクサ経由
 			int16_t _tmp         = 0;
@@ -3865,8 +4455,26 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 				i2c_sensors[port][root_address][bus_channel][0x48].ads1115->setMux(eADSMUX_1);
 				_tmp = i2c_sensors[port][root_address][bus_channel][0x48].ads1115->readAdValue(255);
 				HAL.delay(1);
-				*d_data = i2c_sensors[port][address][bus_channel][sub_address].m5_ammeter->calculateAmpere(_tmp);
+				*d_data = i2c_sensors[port][address][bus_channel][sub_address].m5_am_meter->calculateAmpere(_tmp);
 				return I2C_RES_DOUBLE;
+			default:
+				return I2C_RES_FAILED;
+			}
+		}
+		return I2C_RES_FAILED;
+	case 0x53:
+		if (i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter) {
+			// M5 Ampere meter unit
+			uint8_t root_address = (address == 0x53) ? 0x49 : address; // 0x51 以外の時はマルチプレクサ経由
+			int16_t _tmp         = 0;
+			switch (sub_id) {
+			case 0:
+				HAL.delay(1);
+				i2c_sensors[port][root_address][bus_channel][0x49].ads1115->setMux(eADSMUX_1);
+				_tmp = i2c_sensors[port][root_address][bus_channel][0x49].ads1115->readAdValue(255);
+				HAL.delay(1);
+				*i_data = static_cast<int32_t>(i2c_sensors[port][address][bus_channel][sub_address].m5_volt_meter->calculateVoltage(_tmp));
+				return I2C_RES_INT;
 			default:
 				return I2C_RES_FAILED;
 			}

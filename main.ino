@@ -3,11 +3,12 @@
 struct Features features;
 struct TxEvent_t txEventFlag = {false, false, false};
 
-/*!
- * @brief 初期化処理
- * @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
- * @details 主な機能はセンサデータの取得、バッファへの格納、表示更新。
- */
+// ==================================================================
+// MARK: setup
+//! @brief 初期化処理
+//! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
+//! @details 主な機能はセンサデータの取得、バッファへの格納、表示更新
+// ==================================================================。
 void setup() {
 	HAL.begin();
 	HAL.initializeSemaphoreMutex("i2c");
@@ -170,11 +171,12 @@ void setup() {
 	HAL.Gpio.startPulseCounterAll();
 }
 
-/*!
- * @brief メインループ処理
- * @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT, IoTTxHTTP, IoTTxAmbient, Display
- * @details 主な機能はセンサデータの取得、バッファへの格納、表示更新。
- */
+// ==================================================================
+// MARK: loop
+//! @brief メインループ処理
+//! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT, IoTTxHTTP, IoTTxAmbient, Display
+//! @details 主な機能はセンサデータの取得、バッファへの格納、表示更新。
+// ==================================================================
 void loop() {
 	static struct tm timeinfo = {0};
 
@@ -303,14 +305,14 @@ void loop() {
 
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 //
-//  Logic Functions
+//  MARK: Logic Functions
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
-/*!
- * @brief ユーザ入力応答タスク
- * @param[in] (pvParameters) 未使用
- */
+// ==================================================================
+//! @brief ユーザ入力応答タスク
+//! @param[in] (pvParameters) 未使用
+// ==================================================================
 void userInteractiveLoop(void *pvParameters) {
 	while (1) {
 		HAL.update();
@@ -333,11 +335,11 @@ void userInteractiveLoop(void *pvParameters) {
 	}
 }
 
-/*!
- * @brief ストアしたデータの送信処理タスク
- * @param[in] (pvParameters) 未使用
- * @see  storeValue
- */
+// ==================================================================
+//! @brief ストアしたデータの送信処理タスク
+//! @param[in] (pvParameters) 未使用
+//! @see  storeValue
+// ==================================================================
 void transmitLoop(void *pvParameters) {
 	if (features.offline_mode) {
 		while (1) {
@@ -457,13 +459,13 @@ void transmitLoop(void *pvParameters) {
 	}
 }
 
-/*!
- * @brief センサデータの取得更新処理
- * @param[in] (target) センサタイプの指定
- * @param[in] (target_index) 更新センサのインデックス値（負数は全センサ）
- * @see storeValue, Sensor
- * @note 取得したセンサ値は sensors リスト（vector）に格納される。
- */
+// ==================================================================
+//! @brief センサデータの取得更新処理
+//! @param[in] (target) センサタイプの指定
+//! @param[in] (target_index) 更新センサのインデックス値（負数は全センサ）
+//! @see storeValue, Sensor
+//! @note 取得したセンサ値は sensors リスト（vector）に格納される。
+// ==================================================================
 void updateValue(uint16_t target, int target_index) {
 	uint16_t sensor_num = sensors.size();
 
@@ -667,12 +669,12 @@ void updateValue(uint16_t target, int target_index) {
 	}
 }
 
-/*!
- * @brief センサ値を FIFO リングバッファに格納する
- * @param[in] (timeinfo) センサ値取得時間
- * @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
- * @note 全てのデータは格納時には文字列に変換されます。
- */
+// ==================================================================
+//! @brief センサ値を FIFO リングバッファに格納する
+//! @param[in] (timeinfo) センサ値取得時間
+//! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
+//! @note 全てのデータは格納時には文字列に変換されます。
+// ==================================================================
 void storeValue(struct tm timeinfo) {
 	bool flag_updated   = false;
 	uint16_t sensor_num = sensors.size();
@@ -1143,12 +1145,12 @@ void storeValue(struct tm timeinfo) {
 	}
 }
 
-/*!
- * @brief センサ値を FIFO リングバッファに格納する
- * @param[in] (timeinfo) センサ値取得時間
- * @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
- * @note 全てのデータは格納時には文字列に変換されます。
- */
+// ==================================================================
+//! @brief センサ値を FIFO リングバッファに格納する
+//! @param[in] (timeinfo) センサ値取得時間
+//! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
+//! @note 全てのデータは格納時には文字列に変換されます。
+// ==================================================================
 void storeExceptionalValue(struct tm timeinfo) {
 #ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
 	if (!features.batch_send_enable && !features.camera_enable) {
@@ -1321,10 +1323,10 @@ void storeExceptionalValue(struct tm timeinfo) {
 #endif
 }
 
-/*!
- * @brief 表示用選択センサの切り替え
- * @see printSensorData
- */
+// ==================================================================
+//! @brief 表示用選択センサの切り替え
+//! @see printSensorData
+// ==================================================================
 void toggleSelectedSensor() {
 	bool _disp                = false;
 	bool _all_false           = true;
@@ -1409,12 +1411,12 @@ void toggleSelectedSensor() {
 	printSensorData(true, type);
 }
 
-/*!
- * @brief センサデータの表示要求機能
- * @param[in] (force_update) 更新していない値も表示要求する
- * @see updateDisplay
- * @note センサ値が更新されなかったものは無視される
- */
+// ==================================================================
+//! @brief センサデータの表示要求機能
+//! @param[in] (force_update) 更新していない値も表示要求する
+//! @see updateDisplay
+//! @note センサ値が更新されなかったものは無視される
+// ==================================================================
 void printSensorData(bool force_update, uint16_t target) {
 	uint16_t sensor_num = sensors.size();
 
@@ -1503,9 +1505,9 @@ void printSensorData(bool force_update, uint16_t target) {
 	}
 }
 
-/*!
- * @brief デバッグ/最終手段のデータサルベージ用
- */
+// ==================================================================
+//! @brief デバッグ/最終手段のデータサルベージ用
+// ==================================================================
 void interactiveAdminControl() {
 	int c = HAL.readSerialInput();
 	if (c < 0) {

@@ -71,7 +71,7 @@ void I2C_OneWire::depower() {
 
 void I2C_OneWire::reset_search() {
 	_searchLastDeviceFlag  = 0;
-	_searchLastDiscrepancy = 0;
+	_searchLastDiscrepancy = 0; // 0 means no discrepancy yet (using 1-based indexing)
 	for (int i = 0; i < 8; i++) {
 		_searchAddress[i] = 0;
 	}
@@ -94,9 +94,9 @@ bool I2C_OneWire::search(uint8_t *newAddr, bool search_mode /* =true */) {
 
 	wireWriteByte((search_mode) ? 0xF0 : 0xEC);
 
-	for (uint8_t i = 0; i < 64; i++) {
-		int searchByte = i / 8;
-		int searchBit  = 1 << i % 8;
+	for (uint8_t i = 1; i <= 64; i++) {
+		int searchByte = (i - 1) / 8;
+		int searchBit  = 1 << ((i - 1) % 8);
 
 		if (i < _searchLastDiscrepancy)
 			direction = _searchAddress[searchByte] & searchBit;
@@ -104,6 +104,7 @@ bool I2C_OneWire::search(uint8_t *newAddr, bool search_mode /* =true */) {
 			direction = (i == _searchLastDiscrepancy);
 
 		wireWriteTriplet(direction ? 0x80 : 0x00);
+		busyWait();
 
 		uint8_t status = wireReadStatus();
 

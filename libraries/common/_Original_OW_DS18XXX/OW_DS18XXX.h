@@ -19,19 +19,19 @@ uint8_t crc8(const uint8_t *addr, uint8_t len);
 #include <Arduino.h>
 #endif
 
-//#include <map>
+// #include <map>
 #include <vector>
 
 class DS18XXX {
 public:
-	DS18XXX(uint8_t *_romId, bool _isParasiteMode) {
+	DS18XXX(const uint8_t *_romId, bool _isParasiteMode) {
 		for (int i = 0; i < 8; i++) {
 			RomId[i] = _romId[i];
 		}
 		IsParasiteMode = _isParasiteMode;
 	}
 
-	bool isMatchRomId(uint8_t *_romId) {
+	bool isMatchRomId(const uint8_t *_romId) const {
 		for (int i = 0; i < 8; i++) {
 			if (_romId[i] != RomId[i]) {
 				return false;
@@ -120,7 +120,7 @@ public:
 		return (_targetDeviceIndex < 0) ? false : true;
 	}
 
-	bool setTargetDevice(uint8_t *addr) {
+	bool setTargetDevice(const uint8_t *addr) {
 		return setTargetDevice(addr2index(addr));
 	}
 
@@ -146,6 +146,11 @@ public:
 			return 0x00;
 		}
 		return _oneWireDevices[_targetDeviceIndex].RomId[0];
+	}
+
+	String getFamilyName(uint8_t family_code) {
+		const FamilyInfo *info = findFamily(family_code);
+		return info ? String(info->name) : String("Unknown");
 	}
 
 	uint8_t getResolution() {
@@ -208,42 +213,9 @@ public:
 		return _isLastConversionSuccess;
 	}
 
-	double getTempC(bool wait_calibration = false) {
+	double getTempC() {
 		const uint8_t CONVERT_T  = 0x44;
 		_isLastConversionSuccess = false;
-
-		if (wait_calibration) {
-			uint16_t tmp = _waitTimeMs;
-
-			constexpr uint16_t MAX_WAIT_TIME = 990;
-			while (_waitTimeMs < MAX_WAIT_TIME) {
-				_one_wire->reset();
-
-				_one_wire->select(_oneWireDevices[_targetDeviceIndex].RomId);
-				_one_wire->write(CONVERT_T);
-
-				waitForConversion(_waitTimeMs);
-
-				if (readScratchpad(_oneWireDevices[_targetDeviceIndex].RomId) == false) {
-					break;
-				}
-
-				// if (_scratchPad.array[6] == 0x0C) {
-				// 	_waitTimeMs += 10;
-				// } else {
-				// 	break;
-				// }
-			}
-
-			if (_waitTimeMs != tmp) {
-				// 待ち時間が更新された場合、バッファ時間を再度追加
-				_waitTimeMs += 10;
-			}
-
-#ifdef ENABLE_DS18XXX_DEBUG_MODE
-			Serial.printf("\n_waitTimeMs updated to %dms\n", _waitTimeMs);
-#endif
-		}
 
 		if (!_one_wire->reset()) {
 			return -999;
@@ -318,13 +290,35 @@ private:
 	};
 	union Scratchpad _scratchPad;
 
-	int16_t addr2index(uint8_t *addr) {
+	struct FamilyInfo {
+		uint8_t code;
+		const char *name;
+	};
+
+	// 共通のヘルパー関数
+	static const FamilyInfo *findFamily(uint8_t family_code) {
+		static const FamilyInfo VALID_FAMILIES[] = {
+		    {0x10, "DS18S20"},
+		    {0x28, "DS18B20"},
+		    {0x22, "DS1822"},
+		    {0x42, "DS28EA00"},
+		};
+		static const size_t FAMILY_COUNT = sizeof(VALID_FAMILIES) / sizeof(VALID_FAMILIES[0]);
+
+		for (size_t i = 0; i < FAMILY_COUNT; i++) {
+			if (family_code == VALID_FAMILIES[i].code) {
+				return &VALID_FAMILIES[i];
+			}
+		}
+		return nullptr;
+	}
+
+	int16_t addr2index(const uint8_t *addr) {
 		for (int i = 0; i < _oneWireDevices.size(); i++) {
 			if (_oneWireDevices[i].isMatchRomId(addr) == true) {
 				return i;
 			}
 		}
-
 		return -1;
 	}
 
@@ -345,7 +339,7 @@ private:
 		return !((bool)result);
 	}
 
-	bool checkParasiteMode(uint8_t *addr) {
+	bool checkParasiteMode(const uint8_t *addr) {
 		const uint8_t READ_POWER_SUPPLY = 0xB4;
 
 		if (!_one_wire->reset()) {
@@ -367,24 +361,10 @@ private:
 	}
 
 	bool validFamily(const uint8_t *addr) {
-		const uint8_t DS18S20 = 0x10; // also DS1820
-		const uint8_t DS18B20 = 0x28; // also MAX31820
-		const uint8_t DS1822  = 0x22;
-		// const uint8_t DS1825   = 0x3B;// conflict MAX31850K
-		const uint8_t DS28EA00 = 0x42;
-		switch (addr[0]) {
-		case DS18S20:
-		case DS18B20:
-		case DS1822:
-		// case DS1825:
-		case DS28EA00:
-			return true;
-		default:
-			return false;
-		}
+		return findFamily(addr[0]) != nullptr;
 	}
 
-	bool readScratchpad(uint8_t *addr) {
+	bool readScratchpad(const uint8_t *addr) {
 		const uint8_t READ_SCRATCHPAD = 0xBE;
 
 		if (!_one_wire->reset()) {
@@ -404,7 +384,7 @@ private:
 		return (_one_wire->crc8(_scratchPad.array, 8) == _scratchPad.BYTE.CRC);
 	}
 
-	bool writeScratchpad(uint8_t *addr) {
+	bool writeScratchpad(const uint8_t *addr) {
 		const uint8_t WRITE_SCRATCHPAD = 0x4E;
 		const uint8_t COPY_SCRATCHPAD  = 0x48;
 

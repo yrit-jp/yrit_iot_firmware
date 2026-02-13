@@ -69,8 +69,21 @@ arduino-cli.exe compile ^
 --verbose ^
 ../
 
+REM arduino-cliのエラーチェック
+if errorlevel 1 (
+  echo.
+  powershell -Command "Write-Host '========================================' -ForegroundColor Red"
+  powershell -Command "Write-Host '  BUILD FAILED!' -ForegroundColor Red"
+  powershell -Command "Write-Host '  arduino-cli compile error occurred.' -ForegroundColor Red"
+  powershell -Command "Write-Host '========================================' -ForegroundColor Red"
+  echo.
+  pause
+  exit /b 1
+)
+
 REM 一括リネーム
-ren .\output\!TARGET!\!PROGRAM_DIR!\!vName!\yrit_iot_device* !PROGRAM_NAME!*
+ren .\output\!TARGET!\!PROGRAM_DIR!\!vName!\yrit_iot_firmware.ino* !PROGRAM_NAME!.ino* 2>nul
+ren .\output\!TARGET!\!PROGRAM_DIR!\!vName!\_yrit_iot_firmware.ino* !PROGRAM_NAME!.ino* 2>nul
 
 REM 変更履歴ファイルをコピー
 if defined v_release_tag (
@@ -82,8 +95,8 @@ if defined v_release_tag (
 )
 
 REM 不要ファイルの削除
-del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.map
-del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.elf
+del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.map 2>nul
+del .\output\!TARGET!\!PROGRAM_DIR!\!vName!\*.elf 2>nul
 
 REM 終了時にベルを鳴らす
 echo 
