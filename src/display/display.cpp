@@ -351,6 +351,11 @@ void updateDisplay(enum DisplayTiming dt, ...) {
 		render->printf("時刻の取得に失敗しました\n5秒後に再起動します...");
 
 		break;
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: Ambient
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 	case DisplayTiming::AMBIENT_INIT_BEGIN:
 		initMsgBox();
 		render->printf("Ambient 初期化中 ...");
@@ -370,6 +375,11 @@ void updateDisplay(enum DisplayTiming dt, ...) {
 	}
 	case DisplayTiming::AMBIENT_INIT_DONE:
 		break;
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: FTP
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 	case DisplayTiming::FTP_INIT_BEGIN:
 		initMsgBox();
 		render->printf("FTP 初期化中 ...");
@@ -389,6 +399,11 @@ void updateDisplay(enum DisplayTiming dt, ...) {
 	}
 	case DisplayTiming::FTP_INIT_DONE:
 		break;
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: HTTP
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 	case DisplayTiming::HTTP_INIT_BEGIN:
 		initMsgBox();
 		render->printf("HTTP 初期化中 ...");
@@ -408,6 +423,11 @@ void updateDisplay(enum DisplayTiming dt, ...) {
 	}
 	case DisplayTiming::HTTP_INIT_DONE:
 		break;
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: MQTT
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 	case DisplayTiming::MQTT_INIT_BEGIN:
 		initMsgBox();
 		render->printf("MQTT 初期化中 ...");
@@ -427,6 +447,51 @@ void updateDisplay(enum DisplayTiming dt, ...) {
 	}
 	case DisplayTiming::MQTT_INIT_DONE:
 		break;
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: LoRaWAN
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
+	case DisplayTiming::LORA_WAN_INIT_BEGIN: {
+		initMsgBox();
+		render->printf("LoRaWAN 初期化中 ...");
+
+		break;
+	}
+	case DisplayTiming::LORA_WAN_JOIN_BEGIN: {
+		initMsgBox();
+		render->printf("LoRaWAN 接続中 ...");
+
+		break;
+	}
+	case DisplayTiming::LORA_WAN_JOIN_DONE: {
+		break;
+	}
+	case DisplayTiming::LORA_WAN_BUFFER_UPDATE: {
+		int remain_data_quantity = va_arg(ap, int);
+
+		callWithSemaphore(cb_LoraBufferUpdate, remain_data_quantity);
+
+		break;
+	}
+	case DisplayTiming::LORA_WAN_INIT_FAILED: {
+		const char *err_msg = va_arg(ap, const char *);
+
+		initMsgBox(CursorPosition::DUAL_LINE);
+		render->setFontColor(TFT_RED);
+		render->printf("LoRaWAN の初期化に失敗しました（再起動中）\n");
+		render->printf("%s", err_msg);
+
+		break;
+	}
+	case DisplayTiming::LORA_WAN_INIT_DONE: {
+		break;
+	}
+
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+		//  MARK: Timer
+		/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
 	case DisplayTiming::TI_INIT_BEGIN:
 		initMsgBox();
 		render->printf("タイマ 初期化中 ...");

@@ -19,7 +19,7 @@
 #define NIMBLE_CPP_DEVICE_H_
 
 #include "nimconfig.h"
-#if defined(CONFIG_BT_ENABLED)
+#if CONFIG_BT_ENABLED
 # ifdef ESP_PLATFORM
 #  ifndef CONFIG_IDF_TARGET_ESP32P4
 #   include <esp_bt.h>
@@ -40,16 +40,16 @@
 # include <string>
 # include <vector>
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL
 #  include <array>
 class NimBLEClient;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_OBSERVER)
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
 class NimBLEScan;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_BROADCASTER)
+# if CONFIG_BT_NIMBLE_ROLE_BROADCASTER
 #  if CONFIG_BT_NIMBLE_EXT_ADV
 class NimBLEExtAdvertising;
 #  else
@@ -57,11 +57,14 @@ class NimBLEAdvertising;
 #  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
 class NimBLEServer;
+#  if CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM > 0
+class NimBLEL2CAPServer;
+#  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL) || defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL || CONFIG_BT_NIMBLE_ROLE_CENTRAL
 class NimBLEConnInfo;
 # endif
 
@@ -95,6 +98,13 @@ class NimBLEDeviceCallbacks;
 # define BLEEddystoneTLM              NimBLEEddystoneTLM
 # define BLEEddystoneURL              NimBLEEddystoneURL
 # define BLEConnInfo                  NimBLEConnInfo
+# define BLEL2CAPServer               NimBLEL2CAPServer
+# define BLEL2CAPService              NimBLEL2CAPService
+# define BLEL2CAPServiceCallbacks     NimBLEL2CAPServiceCallbacks
+# define BLEL2CAPClient               NimBLEL2CAPClient
+# define BLEL2CAPClientCallbacks      NimBLEL2CAPClientCallbacks
+# define BLEL2CAPChannel              NimBLEL2CAPChannel
+# define BLEL2CAPChannelCallbacks     NimBLEL2CAPChannelCallbacks
 
 # ifdef CONFIG_BT_NIMBLE_MAX_CONNECTIONS
 #  define NIMBLE_MAX_CONNECTIONS CONFIG_BT_NIMBLE_MAX_CONNECTIONS
@@ -102,12 +112,7 @@ class NimBLEDeviceCallbacks;
 #  define NIMBLE_MAX_CONNECTIONS CONFIG_NIMBLE_MAX_CONNECTIONS
 # endif
 
-enum class NimBLETxPowerType {
-    All  = 0,
-    Advertise  = 1,
-    Scan = 2,
-    Connection = 3
-};
+enum class NimBLETxPowerType { All = 0, Advertise = 1, Scan = 2, Connection = 3 };
 
 typedef int (*gap_event_handler)(ble_gap_event* event, void* arg);
 
@@ -133,6 +138,7 @@ class NimBLEDevice {
     static void          setDeviceCallbacks(NimBLEDeviceCallbacks* cb);
     static void          setScanDuplicateCacheSize(uint16_t cacheSize);
     static void          setScanFilterMode(uint8_t type);
+    static void          setScanDuplicateCacheResetTime(uint16_t time);
     static bool          setCustomGapHandler(gap_event_handler handler);
     static void          setSecurityAuth(bool bonding, bool mitm, bool sc);
     static void          setSecurityAuth(uint8_t auth);
@@ -149,6 +155,7 @@ class NimBLEDevice {
     static void          host_task(void* param);
     static int           getPower(NimBLETxPowerType type = NimBLETxPowerType::All);
     static bool          setPower(int8_t dbm, NimBLETxPowerType type = NimBLETxPowerType::All);
+    static bool          setDefaultPhy(uint8_t txPhyMask, uint8_t rxPhyMask);
 
 # ifdef ESP_PLATFORM
 #  ifndef CONFIG_IDF_TARGET_ESP32P4
@@ -157,25 +164,25 @@ class NimBLEDevice {
 #  endif
 # endif
 
-# if CONFIG_BT_NIMBLE_EXT_ADV
-    static bool setDefaultPhy(uint8_t txPhyMask, uint8_t rxPhyMask);
-# endif
-
-# if defined(CONFIG_BT_NIMBLE_ROLE_OBSERVER)
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
     static NimBLEScan* getScan();
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
     static NimBLEServer* createServer();
     static NimBLEServer* getServer();
+#  if CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM > 0
+    static NimBLEL2CAPServer* createL2CAPServer();
+    static NimBLEL2CAPServer* getL2CAPServer();
+#  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL) || defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL || CONFIG_BT_NIMBLE_ROLE_CENTRAL
     static bool injectConfirmPasskey(const NimBLEConnInfo& peerInfo, bool accept);
     static bool injectPassKey(const NimBLEConnInfo& peerInfo, uint32_t pin);
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_BROADCASTER)
+# if CONFIG_BT_NIMBLE_ROLE_BROADCASTER
 #  if CONFIG_BT_NIMBLE_EXT_ADV
     static NimBLEExtAdvertising* getAdvertising();
     static bool                  startAdvertising(uint8_t instId, int duration = 0, int maxEvents = 0);
@@ -189,7 +196,7 @@ class NimBLEDevice {
 #  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL
     static NimBLEClient*              createClient();
     static NimBLEClient*              createClient(const NimBLEAddress& peerAddress);
     static bool                       deleteClient(NimBLEClient* pClient);
@@ -200,7 +207,7 @@ class NimBLEDevice {
     static std::vector<NimBLEClient*> getConnectedClients();
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL) || defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL || CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
     static bool          deleteBond(const NimBLEAddress& address);
     static int           getNumBonds();
     static bool          isBonded(const NimBLEAddress& address);
@@ -218,15 +225,18 @@ class NimBLEDevice {
     static NimBLEDeviceCallbacks*     m_pDeviceCallbacks;
     static NimBLEDeviceCallbacks      defaultDeviceCallbacks;
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_OBSERVER)
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
     static NimBLEScan* m_pScan;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
     static NimBLEServer* m_pServer;
+#  if CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM > 0
+    static NimBLEL2CAPServer* m_pL2CAPServer;
+#  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_BROADCASTER)
+# if CONFIG_BT_NIMBLE_ROLE_BROADCASTER
 #  if CONFIG_BT_NIMBLE_EXT_ADV
     static NimBLEExtAdvertising* m_bleAdvertising;
 #  else
@@ -234,31 +244,32 @@ class NimBLEDevice {
 #  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL
     static std::array<NimBLEClient*, NIMBLE_MAX_CONNECTIONS> m_pClients;
 # endif
 
 # ifdef ESP_PLATFORM
-#  ifdef CONFIG_BTDM_BLE_SCAN_DUPL
+#  if CONFIG_BTDM_BLE_SCAN_DUPL || CONFIG_BT_LE_SCAN_DUPL
     static uint16_t m_scanDuplicateSize;
     static uint8_t  m_scanFilterMode;
+    static uint16_t m_scanDuplicateResetTime;
 #  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL
     friend class NimBLEClient;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_OBSERVER)
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
     friend class NimBLEScan;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
     friend class NimBLEServer;
     friend class NimBLECharacteristic;
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_BROADCASTER)
+# if CONFIG_BT_NIMBLE_ROLE_BROADCASTER
     friend class NimBLEAdvertising;
 #  if CONFIG_BT_NIMBLE_EXT_ADV
     friend class NimBLEExtAdvertising;
@@ -267,25 +278,29 @@ class NimBLEDevice {
 # endif
 };
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL
 #  include "NimBLEClient.h"
 #  include "NimBLERemoteService.h"
 #  include "NimBLERemoteCharacteristic.h"
 #  include "NimBLERemoteDescriptor.h"
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_OBSERVER)
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
 #  include "NimBLEScan.h"
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
 #  include "NimBLEServer.h"
 #  include "NimBLEService.h"
 #  include "NimBLECharacteristic.h"
 #  include "NimBLEDescriptor.h"
+#  if CONFIG_BT_NIMBLE_L2CAP_COC_MAX_NUM
+#   include "NimBLEL2CAPServer.h"
+#   include "NimBLEL2CAPChannel.h"
+#  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_BROADCASTER)
+# if CONFIG_BT_NIMBLE_ROLE_BROADCASTER
 #  if CONFIG_BT_NIMBLE_EXT_ADV
 #   include "NimBLEExtAdvertising.h"
 #  else
@@ -293,10 +308,11 @@ class NimBLEDevice {
 #  endif
 # endif
 
-# if defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL) || defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+# if CONFIG_BT_NIMBLE_ROLE_CENTRAL || CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
 #  include "NimBLEConnInfo.h"
 # endif
 
+# include "NimBLEAddress.h"
 # include "NimBLEUtils.h"
 
 /**

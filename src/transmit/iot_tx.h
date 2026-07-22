@@ -28,7 +28,10 @@ enum class LogCategory : int {
 	HTTP_HB,
 	MQTT,
 	MQTT_EX,
-	MQTT_HB
+	MQTT_HB,
+	LORA_WAN,
+	LORA_WAN_EX,
+	LORA_WAN_HB
 };
 
 enum class LogLevel : int {
@@ -118,7 +121,7 @@ public:
 	// =============================================================
 	template <typename T>
 	void addExceptionalValue(uint8_t storage, struct tm time_stamp, T name, String unit = "", uint8_t port = 0) {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 		if (_EXCEPTIONAL_STORAGE_NUM <= storage) {
 			// Exceed array index
 			return;

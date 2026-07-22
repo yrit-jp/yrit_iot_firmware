@@ -8,6 +8,7 @@
 
 #include <esp_log.h>
 #include <esp_sleep.h>
+#include <driver/rtc_io.h>
 #include <sdkconfig.h>
 
 #include <soc/soc_caps.h>
@@ -31,9 +32,13 @@ namespace m5
   static constexpr const uint32_t i2c_freq = 100000;
 
 #if !defined (M5UNIFIED_PC_BUILD)
+  static constexpr uint8_t m5pm1_i2c_addr = 0x6E;
+
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
   static constexpr uint8_t aw9523_i2c_addr = 0x58;
   static constexpr uint8_t powerhub_i2c_addr = 0x50;
+  static constexpr uint8_t m5ioe1_i2c_addr = 0x4F;
+  static constexpr uint8_t ip2315_i2c_addr = 0x75; // M5PaperMono USB fast-charger
   static constexpr int M5PaperS3_CHG_STAT_PIN = GPIO_NUM_4;
 
 #elif defined (CONFIG_IDF_TARGET_ESP32C6)
@@ -159,6 +164,7 @@ namespace m5
 
     case board_t::board_M5StackCoreS3:
     case board_t::board_M5StackCoreS3SE:
+    case board_t::board_M5StackChan:
       M5.In_I2C.bitOn(aw9523_i2c_addr, 0x03, 0b10000000, i2c_freq);  // SY7088 BOOST_EN
       _pmic = Power_Class::pmic_t::pmic_axp2101;
       Axp2101.begin();
@@ -176,12 +182,108 @@ namespace m5
       Axp2101.writeRegister8Array(reg_data_array, sizeof(reg_data_array));
       break;
 
+    case board_t::board_M5StickS3:
+      _pmic = pmic_t::pmic_m5pm1;
+      {
+        // Configure PM1_G0 as input mode for charging status reading
+        // Set pin gpio0 as gpio function: register 0x16 bit 0 (bit off = GPIO function)
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x16, i2c_freq);
+        reg_val &= ~(1 << 0);  // Clear bit 0 (GPIO function)
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x16, reg_val, i2c_freq);
+        // Set pin gpio0 mode: input: register 0x10 bit 0 (bit off = input mode)
+        reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x10, i2c_freq);
+        reg_val &= ~(1 << 0);  // Clear bit 0 (input mode)
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x10, reg_val, i2c_freq);
+      }
+      break;
+
+    case board_t::board_M5StopWatch:
+      _pmic = pmic_t::pmic_m5pm1;
+      {
+        // M5PM1: GPIO2 as GPIO input (charge status on G2; low = charging). REG_GPIO_FUNC0 0x16 [5:4]=00.
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x16, i2c_freq);
+        reg_val &= static_cast<uint8_t>(~(0x03u << 4));
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x16, reg_val, i2c_freq);
+        reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x10, i2c_freq);
+        reg_val &= static_cast<uint8_t>(~(1u << 2));  // REG_GPIO_MODE: 0=input
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x10, reg_val, i2c_freq);
+
+        // M5IOE1: PWM1 drives IO9 (G9 motor). REG_PWM_FREQ 0x25/0x26 Hz LE; REG_PWM1_DUTY 0x1B/0x1C (bit7 EN).
+        constexpr uint16_t motor_pwm_hz = 2000;
+        M5.In_I2C.writeRegister8(m5ioe1_i2c_addr, 0x23, 0x00, i2c_freq);  // REG_I2C_CFG: disable I2C sleep
+        uint8_t pwm_freq_le[2] = {
+          static_cast<uint8_t>(motor_pwm_hz & 0xFF),
+          static_cast<uint8_t>((motor_pwm_hz >> 8) & 0xFF),
+        };
+        M5.In_I2C.writeRegister(m5ioe1_i2c_addr, 0x25, pwm_freq_le, sizeof(pwm_freq_le), i2c_freq);
+        // IO9 (G9 motor / PWM1): push-pull output, duty off until setVibration
+        M5.In_I2C.bitOff(m5ioe1_i2c_addr, 0x14, 0b00000001, i2c_freq);
+        M5.In_I2C.bitOn(m5ioe1_i2c_addr, 0x04, 0b00000001, i2c_freq);
+        M5.In_I2C.writeRegister8(m5ioe1_i2c_addr, 0x1B, 0x00, i2c_freq);
+        M5.In_I2C.writeRegister8(m5ioe1_i2c_addr, 0x1C, 0x00, i2c_freq);  // PWM off at boot
+      }
+      break;
+
+    case board_t::board_M5StampS3Bat:
+      _pmic = pmic_t::pmic_m5pm1;
+      {
+        // Configure PM1_G1 ~ PM1_G3 to GPIO mode
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x16, i2c_freq);
+        reg_val &= 0x03;  // set to gpio function
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x16, reg_val, i2c_freq);
+        // gpio1 mode: output: register 0x10 bit 1 (bit on = output mode)
+        // gpio2 mode: input: register 0x10 bit 2 (bit off = input mode)
+        // gpio3 mode: input: register 0x10 bit 3 (bit on = output mode)
+        reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x10, i2c_freq);
+        reg_val |= (1 << 1);   // Set bit 1 , set to output mode
+        reg_val &= ~(1 << 2);  // Clear bit 2 , set to input mode
+        reg_val |= (1 << 3);   // Set bit 3 , set to output mode
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x10, reg_val, i2c_freq);
+        // gpio1, gpio3 set to push pull mode
+        reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x13, i2c_freq);
+        reg_val &= ~(1 << 1);   // Clear bit 1 , set gpio1 to push pull mode
+        reg_val &= ~(1 << 3);   // Clear bit 3 , set gpio3 to push pull mode
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x13, reg_val, i2c_freq);
+      }
+      break;
+
     case board_t::board_M5PaperS3:
       m5gfx::pinMode(M5PaperS3_CHG_STAT_PIN, m5gfx::pin_mode_t::input);
       _batAdcCh = ADC1_GPIO3_CHANNEL;
       _batAdcUnit = 1;
       _pmic = pmic_t::pmic_adc;
       _adc_ratio = 2.0f;
+      _wakeupPin = GPIO_NUM_48; // touch panel INT
+      break;
+    
+    case board_t::board_M5PaperColor:
+      _rtcIntPin = GPIO_NUM_7;
+      _pmic = pmic_t::pmic_m5pm1;
+      {
+        M5.In_I2C.bitOn(m5pm1_i2c_addr, 0x06, 1 << 2, i2c_freq);  // Enable LDO (RGB PWR EN)
+        // Turn on TF Card Power
+        M5.In_I2C.bitOff(m5pm1_i2c_addr, 0x16, 1 << 3, i2c_freq); // Set pin gpio3 as gpio function
+        M5.In_I2C.bitOn(m5pm1_i2c_addr, 0x10, 1 << 3, i2c_freq);  // Set pin gpio3 mode: output
+        M5.In_I2C.bitOff(m5pm1_i2c_addr, 0x13, 1 << 3, i2c_freq); // Set gpio3 push-pull mode
+        M5.In_I2C.bitOn(m5pm1_i2c_addr, 0x11, 1 << 3, i2c_freq); // Set gpio3 output high
+      }
+      break;
+    
+    case board_t::board_M5PaperMono:
+      _rtcIntPin = GPIO_NUM_1;
+      _pmic = pmic_t::pmic_m5pm1;
+      // M5PaperMono charging is controlled by the IP2316 charger (not PM1).
+      // Enable IP2316 readout/control by driving IOE1 IO11 ("CHARGE READ") high.
+      // IP2316 stays off the I2C bus while IO11 is low, and answers ~1.3ms after high
+      // (measured), so polling its address is enough; no fixed startup delay is needed.
+      // IO11 = bit10 of the 16-bit GPIO regs = bit2 of the high byte (P14-P9).
+      M5.In_I2C.writeRegister8(m5ioe1_i2c_addr, 0x23, 0x00, i2c_freq); // I2C_CFG: disable IOE1 idle-sleep
+      M5.In_I2C.bitOff(m5ioe1_i2c_addr, 0x14, 1 << 2, i2c_freq); // GPIO_DRV_H: IO11 push-pull
+      M5.In_I2C.bitOn (m5ioe1_i2c_addr, 0x04, 1 << 2, i2c_freq); // GPIO_MODE_H: IO11 output
+      M5.In_I2C.bitOn (m5ioe1_i2c_addr, 0x06, 1 << 2, i2c_freq); // GPIO_OUT_H: IO11 high
+      // Wait for the IP2316 to wake, then enable battery charging (SYS_CTL1 0x01 bit0 = EN_CHG).
+      for (int i = 0; i < 64 && !M5.In_I2C.scanID(ip2315_i2c_addr, i2c_freq); ++i) {}
+      M5.In_I2C.bitOn(ip2315_i2c_addr, 0x01, 1 << 0, i2c_freq);
       break;
 
     case board_t::board_M5Capsule:
@@ -210,11 +312,25 @@ namespace m5
     case board_t::board_M5PowerHub:
       M5.In_I2C.writeRegister8(powerhub_i2c_addr, 0x05, 1, i2c_freq); // Enabel VAMeter
       break;
+    
+    case board_t::board_M5StampPLC:
+      _rtcIntPin = GPIO_NUM_14;
+      Ina226.begin();
+      INA226_Class::config_t cfg;
+      cfg.sampling_rate = INA226_Class::Sampling::Rate16;
+      cfg.bus_conversion_time = INA226_Class::ConversionTime::US_1100;
+      cfg.shunt_conversion_time = INA226_Class::ConversionTime::US_1100;
+      cfg.mode = INA226_Class::Mode::ShuntAndBus;
+      cfg.shunt_res = 0.01f;
+      cfg.max_expected_current = 2.0f;
+      Ina226.config(cfg);
+      break;
     }
 
 #elif !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32)
 
     /// setup power management ic
+    
     switch (M5.getBoard())
     {
     default:
@@ -385,7 +501,7 @@ namespace m5
         ///       ||||||||
         , 0x33, 0b11000000 // reg33h Charge control 1 (Charge 4.2V, 100mA)
 
-        , 0x35, 0xA2    // reg35h Enable RTC BAT charge 
+        , 0x35, 0xA2    // reg35h Enable RTC BAT charge
         , 0x36, 0x0C    // reg36h 128ms power on, 4s power off
         , 0x40, 0x00    // reg40h IRQ 1, all disable
         , 0x41, 0x00    // reg41h IRQ 2, all disable
@@ -435,7 +551,7 @@ namespace m5
       case board_t::board_M5Station:
         {
           Axp192.setLDO2(3300);
-          static constexpr std::uint8_t reg92h_96h[] = 
+          static constexpr std::uint8_t reg92h_96h[] =
           { 0x00 // GPIO1 NMOS OpenDrain
           , 0x00 // GPIO2 NMOS OpenDrain
           , 0x00 // GPIO0~2 low
@@ -474,6 +590,18 @@ namespace m5
 
 
 #endif
+
+    if (_pmic == pmic_t::pmic_m5pm1)
+    {
+      // reg: 0x09(I2C_CFG) - Set to 0x00 to disable I2C idle sleep mode.
+      // PMIC is always-on powered, and with battery power, shutdown doesn't reset the chip.
+      // This register may have been modified elsewhere, causing PMIC communication issues.
+      // Explicitly set it here during initialization to ensure proper operation.
+      M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x09, 0x00, i2c_freq);
+
+      // PM1 watchdog is enabled by default; disable it to avoid periodic reset.
+      M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x0A, 0x00, i2c_freq); // WDT_CNT = 0 (disable)
+    }
 
 #endif
     return (_pmic != pmic_t::pmic_unknown);
@@ -545,9 +673,12 @@ namespace m5
       M5.getIOExpander(1).digitalWrite(2, enable); // 2 = EXT_PWR_EN
       break;
 
+#elif defined (CONFIG_IDF_TARGET_ESP32H2)
+
 #elif defined (CONFIG_IDF_TARGET_ESP32S3)
     case board_t::board_M5StackCoreS3:
     case board_t::board_M5StackCoreS3SE:
+    case board_t::board_M5StackChan:
       {
         bool cancel = (enable && !Axp2101.getBatState() && Axp2101.getTSVoltage() > 2.0f && Axp2101.isVBUS());
         if (!cancel)
@@ -558,6 +689,32 @@ namespace m5
         }
       }
       break;
+
+    case board_t::board_M5StickS3:
+    case board_t::board_M5StopWatch:
+    case board_t::board_M5PaperColor:
+      if (_pmic == pmic_t::pmic_m5pm1)
+      {
+        // Control 5V output: register 0x06 bit 3 (1=enable, 0=disable)
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x06, i2c_freq);
+        if (enable) {
+          reg_val |= 0x08;  // Set bit 3
+        } else {
+          reg_val &= ~0x08; // Clear bit 3
+        }
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x06, reg_val, i2c_freq);
+      }
+      break;
+
+    case board_t::board_M5StampS3Bat:
+      // Use G1 Control 5V output
+      if (enable) {
+        M5.In_I2C.bitOn(m5pm1_i2c_addr, 0x11, 1 << 1, i2c_freq); // Set G1 to High level
+      } else {
+        M5.In_I2C.bitOff(m5pm1_i2c_addr, 0x11, 1 << 1, i2c_freq);
+      }
+      break;
+
     case board_t::board_M5PowerHub:
       if (port_mask & ext_port_mask_t::ext_USB)
       {
@@ -648,15 +805,19 @@ namespace m5
     case board_t::board_ArduinoNessoN1:
       return M5.getIOExpander(1).getWriteValue(2); // E1-> 2 = EXT_PWR_EN
 
+#elif defined (CONFIG_IDF_TARGET_ESP32H2)
+
 #elif defined (CONFIG_IDF_TARGET_ESP32S3)
     case board_t::board_M5StackCoreS3:
     case board_t::board_M5StackCoreS3SE:
+    case board_t::board_M5StackChan:
       {
         static constexpr const uint32_t port0_bitmask = 0b00000010; // BUS EN
         static constexpr const uint8_t port0_reg = 0x02;
         return M5.In_I2C.readRegister8(aw9523_i2c_addr, port0_reg, i2c_freq) & port0_bitmask;
       }
       break;
+
     case board_t::board_M5PowerHub:
       uint8_t buf[4];
       if (M5.In_I2C.readRegister(powerhub_i2c_addr, 0x01, buf, sizeof(buf), i2c_freq))
@@ -664,6 +825,24 @@ namespace m5
         return (*(uint32_t*)buf != 0);
       }
       return false;
+      break;
+
+    case board_t::board_M5StickS3:
+    case board_t::board_M5StopWatch:
+    case board_t::board_M5PaperColor:
+      {
+        // Read 5V output status: register 0x06 bit 3
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x06, i2c_freq);
+        return (reg_val & 0x08) != 0;
+      }
+      break;
+
+    case board_t::board_M5StampS3Bat:
+      {
+        // Read G1 Control 5V output status: register 0x11 bit 1
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x11, i2c_freq);
+        return (reg_val & (1 << 1)) != 0;
+      }
       break;
 #elif !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32)
     case board_t::board_M5Paper:
@@ -698,6 +877,7 @@ namespace m5
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
     case board_t::board_M5StackCoreS3:
     case board_t::board_M5StackCoreS3SE:
+    case board_t::board_M5StackChan:
       _core_s3_output(_core_s3_usb_en, enable);
       break;
 
@@ -714,6 +894,7 @@ namespace m5
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
     case board_t::board_M5StackCoreS3:
     case board_t::board_M5StackCoreS3SE:
+    case board_t::board_M5StackChan:
       {
         static constexpr const uint8_t reg = 0x02;
         return M5.In_I2C.readRegister8(aw9523_i2c_addr, reg, i2c_freq) & _core_s3_usb_en;
@@ -748,6 +929,13 @@ namespace m5
         led->init(brightness);
       }
       led->setBrightness(brightness);
+      break;
+    case board_t::board_ArduinoNessoN1:
+      {
+        // Cannot set brightness; only off and on
+        bool level = (brightness == 0) ? true : false;
+        M5.getIOExpander(1).digitalWrite(7, level);  // E1-> 7 = LED
+      }
       break;
     default:
       break;
@@ -853,7 +1041,7 @@ namespace m5
 
   void Power_Class::_powerOff(bool withTimer)
   {
-#if defined (M5UNIFIED_PC_BUILD)
+#if defined(M5UNIFIED_PC_BUILD)
     (void)withTimer;
 #else
     bool use_deepsleep = true;
@@ -892,6 +1080,24 @@ namespace m5
       case pmic_t::pmic_axp2101:
         Axp2101.powerOff();
         break;
+
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+      case pmic_t::pmic_py32pmic:
+        PY32pmic.powerOff();
+        break;
+
+      case pmic_t::pmic_m5pm1:
+        {
+          if(!withTimer){
+            // Power off: register 0x0C bit 1:0, 01=power off
+            uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x0C, i2c_freq);
+            reg_val &= ~0x03;  // Clear bits 1:0
+            reg_val |= 0xA1;   // Set to A1 (command key | power off)
+            M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x0C, reg_val, i2c_freq);
+          }
+        }
+        break;
+#endif
 
 #endif
 
@@ -933,12 +1139,33 @@ namespace m5
         m5gfx::delay(50);
       }
       break;
+
+    case board_t::board_M5UnitPoEP4:
+      for (int ledPin = 15; ledPin <= 17; ledPin++)
+      {
+        m5gfx::pinMode(ledPin, m5gfx::pin_mode_t::output);
+        m5gfx::gpio_hi(ledPin);
+        m5gfx::delay(50);
+      }
+      break;
+#endif
+
+#if defined (CONFIG_IDF_TARGET_ESP32C6)
+    case board_t::board_ArduinoNessoN1:
+      for (int i = 0; i < 10; ++i)
+      {
+        M5.getIOExpander(1).digitalWrite(0, i & 1); // io1.pin0 == PWROFF_PULSE
+        m5gfx::delay(50);
+      }
+      break;
 #endif
 
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
     case board_t::board_M5PowerHub:
-      uint8_t buf[4]={};
-      M5.In_I2C.writeRegister(powerhub_i2c_addr, 0x01, buf, sizeof(buf), i2c_freq);
+      uint8_t buf[6]={};
+      M5.In_I2C.writeRegister(powerhub_i2c_addr, 0x00, buf, sizeof(buf), i2c_freq);
+      M5.In_I2C.writeRegister8(powerhub_i2c_addr, 0xE0, 1, i2c_freq); 
+      use_deepsleep = false;
       break;
 #endif
     }
@@ -976,6 +1203,17 @@ namespace m5
       break;
     }
 #endif
+#if !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32S3)
+    switch (M5.getBoard())
+    {
+    case board_t::board_M5StampPLC:
+      M5.getIOExpander(0).resetIrq();
+      break;
+
+    default:
+      break;
+    }
+#endif
 #endif
     _powerOff(true);
   }
@@ -989,7 +1227,7 @@ namespace m5
     (void)touch_wakeup;
 #else
     ESP_LOGD("Power","deepSleep");
-#if defined (CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C6) || defined (CONFIG_IDF_TARGET_ESP32P4)
+#if defined (CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C6) // || defined (CONFIG_IDF_TARGET_ESP32P4)
 
 #else
 
@@ -1003,7 +1241,16 @@ namespace m5
     uint_fast8_t wpin = _wakeupPin;
     if (touch_wakeup && wpin < GPIO_NUM_MAX)
     {
+#if SOC_PM_SUPPORT_EXT0_WAKEUP
       esp_sleep_enable_ext0_wakeup((gpio_num_t)wpin, false);
+#elif SOC_PM_SUPPORT_EXT1_WAKEUP && SOC_RTCIO_PIN_COUNT > 0
+      const uint64_t ext_wakeup_pin_1_mask = 1ULL << _wakeupPin;
+      ESP_ERROR_CHECK(esp_sleep_enable_ext1_wakeup_io(ext_wakeup_pin_1_mask, ESP_EXT1_WAKEUP_ANY_LOW));
+ #if SOC_RTCIO_INPUT_OUTPUT_SUPPORTED
+      ESP_ERROR_CHECK(rtc_gpio_pullup_dis((gpio_num_t)_wakeupPin));
+      ESP_ERROR_CHECK(rtc_gpio_pulldown_en((gpio_num_t)_wakeupPin));
+ #endif
+#endif
       while (m5gfx::gpio_in(wpin) == false)
       {
         // Issue #91, ( M5Paper wakes too soon from deep sleep when touch wakeup is enabled - with solution )
@@ -1031,7 +1278,7 @@ namespace m5
     (void)touch_wakeup;
 #else
     ESP_LOGD("Power","lightSleep");
-#if defined (CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C6) || defined (CONFIG_IDF_TARGET_ESP32P4)
+#if defined (CONFIG_IDF_TARGET_ESP32C3) || defined (CONFIG_IDF_TARGET_ESP32C6) || defined (CONFIG_IDF_TARGET_ESP32H2) || defined (CONFIG_IDF_TARGET_ESP32P4)
 
 #else
 
@@ -1045,8 +1292,18 @@ namespace m5
     uint_fast8_t wpin = _wakeupPin;
     if (touch_wakeup && wpin < GPIO_NUM_MAX)
     {
-      esp_sleep_enable_ext0_wakeup((gpio_num_t)wpin, false);
-      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_AUTO);
+      if (M5.getBoard() == board_t::board_M5PaperS3)
+      {
+        // M5PaperS3 touch interrupt pin (GPIO48) is not RTC IO
+        // and therefore not supported in EXT0 wakeup
+        gpio_wakeup_enable((gpio_num_t)wpin, gpio_int_type_t::GPIO_INTR_LOW_LEVEL);
+        esp_sleep_enable_gpio_wakeup();
+      }
+      else
+      {
+        esp_sleep_enable_ext0_wakeup((gpio_num_t)wpin, false);
+        esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_AUTO);
+      }
       while (m5gfx::gpio_in(wpin) == false)
       {
         m5gfx::delay(10);
@@ -1057,8 +1314,12 @@ namespace m5
     }else{
       esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
     }
-#endif
     esp_light_sleep_start();
+    if (M5.getBoard() == board_t::board_M5PaperS3)
+    {
+      gpio_wakeup_disable((gpio_num_t)wpin);
+    }
+#endif
 #endif
   }
 
@@ -1072,6 +1333,7 @@ namespace m5
   void Power_Class::timerSleep( int seconds )
   {
     M5.Rtc.disableIRQ();
+    M5.Rtc.clearIRQ();
     M5.Rtc.setAlarmIRQ(seconds);
 #if !defined (M5UNIFIED_PC_BUILD)
     esp_sleep_enable_timer_wakeup(seconds * 1000000ULL);
@@ -1082,6 +1344,7 @@ namespace m5
   void Power_Class::timerSleep( const rtc_time_t& time)
   {
     M5.Rtc.disableIRQ();
+    M5.Rtc.clearIRQ();
     M5.Rtc.setAlarmIRQ(time);
     _timerSleep();
   }
@@ -1089,6 +1352,7 @@ namespace m5
   void Power_Class::timerSleep( const rtc_date_t& date, const rtc_time_t& time)
   {
     M5.Rtc.disableIRQ();
+    M5.Rtc.clearIRQ();
     M5.Rtc.setAlarmIRQ(date, time);
     _timerSleep();
   }
@@ -1199,6 +1463,19 @@ namespace m5
       f = Axp2101.getVBUSVoltage();
       break;
 
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case pmic_t::pmic_m5pm1:
+      {
+        uint8_t buf[2];
+        // Read VBUS voltage from device 0x6E: register 0x24 (VIN_L) and 0x25 (VIN_H)
+        // Unit: mV, format: (VIN_H << 8) | VIN_L
+        if (M5.In_I2C.readRegister(m5pm1_i2c_addr, 0x24, buf, sizeof(buf), i2c_freq)) {
+          f = ((buf[1] << 8) | buf[0]) / 1000.0f; // Convert mV to V
+        }
+      }
+      break;
+#endif
+
 #endif
 
     default:
@@ -1236,6 +1513,19 @@ namespace m5
 
     case pmic_t::pmic_axp2101:
       return Axp2101.getBatteryVoltage() * 1000;
+
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case pmic_t::pmic_m5pm1:
+      {
+        uint8_t buf[2];
+        // Read battery voltage from device 0x6E: register 0x22 (BAT_L) and 0x23 (BAT_H)
+        // Unit: mV, format: (BAT_H << 8) | BAT_L
+        if (M5.In_I2C.readRegister(m5pm1_i2c_addr, 0x22, buf, sizeof(buf), i2c_freq)) {
+          return (buf[1] << 8) | buf[0];
+        }
+        return 0;
+      }
+#endif
 
 #endif
 
@@ -1296,6 +1586,19 @@ namespace m5
       return Axp2101.getBatteryLevel();
       break;
 
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case pmic_t::pmic_m5pm1:
+      {
+        // Get battery voltage in mV
+        int16_t bat_mv = getBatteryVoltage();
+        if (bat_mv <= 0) {
+          return -1; // Error reading voltage
+        }
+        mv = bat_mv;
+      }
+      break;
+#endif
+
 #endif
 
     case pmic_t::pmic_adc:
@@ -1313,7 +1616,7 @@ namespace m5
 
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
       case board_t::board_M5PowerHub:
-        mv = getBatteryVoltage();
+        mv = getBatteryVoltage() / 2;
         break;
 #endif
       default:
@@ -1354,6 +1657,32 @@ namespace m5
     case pmic_t::pmic_axp2101:
       Axp2101.setBatteryCharge(enable);
       break;
+
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case pmic_t::pmic_m5pm1:
+      {
+        // M5PaperColor does not support charge control
+        if (M5.getBoard() == board_t::board_M5PaperColor) {
+            return;
+        }
+        // M5PaperMono: charging is controlled by the IP2316 charger, not PM1.
+        // IP2316 SYS_CTL1 (0x01) bit0 = EN_CHG. (IO11 was driven high in begin().)
+        if (M5.getBoard() == board_t::board_M5PaperMono) {
+          if (enable) { M5.In_I2C.bitOn (ip2315_i2c_addr, 0x01, 1 << 0, i2c_freq); }
+          else        { M5.In_I2C.bitOff(ip2315_i2c_addr, 0x01, 1 << 0, i2c_freq); }
+          return;
+        }
+        // Control charge enable: register 0x06 bit 0 (1=enable, 0=disable)
+        uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x06, i2c_freq);
+        if (enable) {
+          reg_val |= 0x01;  // Set bit 0
+        } else {
+          reg_val &= ~0x01; // Clear bit 0
+        }
+        M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x06, reg_val, i2c_freq);
+      }
+      return;
+#endif
 
 #endif
 
@@ -1403,9 +1732,55 @@ namespace m5
       Axp2101.setChargeCurrent(max_mA);
       break;
 
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+    case pmic_t::pmic_m5pm1:
+      if (M5.getBoard() == board_t::board_M5StampS3Bat) {
+        if (max_mA >= 650)
+          M5.In_I2C.bitOff(m5pm1_i2c_addr, 0x11, 1 << 3, i2c_freq); // Set G3 to low level
+        else
+          M5.In_I2C.bitOn(m5pm1_i2c_addr, 0x11, 1 << 3, i2c_freq); // Set G3 to High level
+        }
+      break;
+#endif
+
 #endif
 
     default:
+#if defined (CONFIG_IDF_TARGET_ESP32P4)
+      switch (M5.getBoard()) {
+        case board_t::board_M5Tab5: {
+          switch (max_mA) {
+            case 0:
+              // charge disable
+              M5.getIOExpander(1).digitalWrite(7, false); // CHG_EN = HIGH
+              // qc disable
+              M5.getIOExpander(1).digitalWrite(5, true); // CHG_EN = LOW
+              break;
+
+            case 500:
+              // charge enable
+              M5.getIOExpander(1).digitalWrite(7, true); // CHG_EN = HIGH
+              // qc disable
+              M5.getIOExpander(1).digitalWrite(5, true); // CHG_EN = LOW
+              break;
+
+            case 1000:
+              // charge enable
+              M5.getIOExpander(1).digitalWrite(7, true); // CHG_EN = HIGH
+              // qc enable
+              M5.getIOExpander(1).digitalWrite(5, false); // CHG_EN = LOW
+              break;
+
+            default:
+              break;
+          }
+        }
+        break;
+
+      default:
+        return;
+      }
+#endif
       return;
     }
   }
@@ -1455,7 +1830,7 @@ namespace m5
       case board_t::board_M5PowerHub:
         uint8_t buf[2];
         if(M5.In_I2C.readRegister(powerhub_i2c_addr, 0x32, buf, sizeof(buf), i2c_freq))
-          return (int16_t)(buf[1] << 8) | buf[0];
+          return -(int16_t)((buf[1] << 8) | buf[0]);
         return 0;
 #endif
       default:
@@ -1533,11 +1908,46 @@ namespace m5
     default:
       switch (M5.getBoard()) {
 #if defined (CONFIG_IDF_TARGET_ESP32S3)
+        case board_t::board_M5PaperMono:
+        {
+          // PM1 PWR_SRC (0x04) [2:0]: 0=5VIN / 1=5VINOUT / 2=BAT
+          // Running from battery (no external power) -> not charging.
+          uint8_t pwr_src = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x04, i2c_freq) & 0x07;
+          if (pwr_src == 0x02) { return is_charging_t::is_discharging; }
+          // External power present. The IP2316 charger (IO11 enabled in begin()) reports
+          // its state in REG_CHG_STAT(0xC7): bit7 = charging in progress (measured:
+          // 0x82 charging / 0x45 charge-complete / 0x00 charge-disabled).
+          if (M5.In_I2C.scanID(ip2315_i2c_addr, i2c_freq))
+          {
+            uint8_t chg_stat = M5.In_I2C.readRegister8(ip2315_i2c_addr, 0xC7, i2c_freq);
+            return (chg_stat & (1 << 7)) ? is_charging_t::is_charging : is_charging_t::is_discharging;
+          }
+          return is_charging_t::is_discharging; // fallback: charger not responding -> not charging
+        }
+        break;
+
+        case board_t::board_M5StickS3:
+        {
+          // PM1_G0 is charging status input pin, low=charging / high=not charging
+          uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x12, i2c_freq);
+          return (reg_val & 0x01) ? is_charging_t::is_discharging : is_charging_t::is_charging;
+        }
+        break;
+      
+        case board_t::board_M5StopWatch: // M5PM1_G2
+        case board_t::board_M5StampS3Bat: // M5PM1_G2
+        {
+          // PM1_G2 is charging status input pin, low=charging / high=not charging
+          uint8_t reg_val = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x12, i2c_freq);
+          return (reg_val & 0x04) ? is_charging_t::is_discharging : is_charging_t::is_charging;
+        }
+        break;
+
       case board_t::board_M5PaperS3:
         return (m5gfx::gpio_in(M5PaperS3_CHG_STAT_PIN) == false) ? is_charging_t::is_charging : is_charging_t::is_discharging;
 
       case board_t::board_M5PowerHub: // 0x50 reg is not accurate
-        return (getBatteryCurrent() < -10) ? is_charging_t::is_charging : is_charging_t::is_discharging;
+        return (getBatteryCurrent() > 10) ? is_charging_t::is_charging : is_charging_t::is_discharging;
 #endif
 #if defined (CONFIG_IDF_TARGET_ESP32P4)
       case board_t::board_M5Tab5:
@@ -1550,11 +1960,11 @@ namespace m5
     }
   }
 
-  int16_t Power_Class::_readExtValue(ext_port_mask_t port_mask, int reg_offset)
+  float Power_Class::_readExtValue(ext_port_mask_t port_mask, bool is_voltage)
   {
 #if defined(M5UNIFIED_PC_BUILD)
       (void)port_mask;
-      (void)reg_offset;
+      (void)is_voltage;
 #else
     switch (M5.getBoard()) {
     #if defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -1574,29 +1984,51 @@ namespace m5
         uint8_t buf[2];
         for (const auto& pr : port_regs) {
           if (port_mask & pr.mask) {
-            if (M5.In_I2C.readRegister(powerhub_i2c_addr, pr.reg + reg_offset, buf, sizeof(buf), i2c_freq)) {
+            if (M5.In_I2C.readRegister(powerhub_i2c_addr, pr.reg + (is_voltage ? 0 : 2), buf, sizeof(buf), i2c_freq)) {
               return (int16_t)((buf[1] << 8) | buf[0]);
             }
               return 0;
           }
         }
         return 0;
+      }
+
+      case board_t::board_M5StampS3Bat:
+      case board_t::board_M5StopWatch:
+      case board_t::board_M5StickS3: {
+        // Read output voltage from device PM1: register 0x26 (5VOUT_L) and 0x27 (5VOUT_H)
+        // Unit: mV, format: (5VOUT_H << 8) | 5VOUT_L
+        uint8_t buf[2];
+        if (M5.In_I2C.readRegister(m5pm1_i2c_addr, 0x26, buf, sizeof(buf), i2c_freq)) {
+          return (int16_t)((buf[1] << 8) | buf[0]);
+        }
+        return 0;
       } break;
+
+      case board_t::board_M5StampPLC:
+        if (port_mask & (ext_port_mask_t::ext_PWR485 | ext_port_mask_t::ext_PWRCAN)) {
+          if (is_voltage)
+            return Ina226.getBusVoltage() * 1000;
+          else
+            return Ina226.getShuntCurrent() * 1000;
+        }
+        return 0;
     #endif
       default:
         return 0;
       }
 #endif
+    return 0;
   }
 
-  int16_t Power_Class::getExtVoltage(ext_port_mask_t port_mask)
+  float Power_Class::getExtVoltage(ext_port_mask_t port_mask)
   {
-    return _readExtValue(port_mask, 0);
+    return _readExtValue(port_mask, true);
   }
 
-  int16_t Power_Class::getExtCurrent(ext_port_mask_t port_mask)
+  float Power_Class::getExtCurrent(ext_port_mask_t port_mask)
   {
-    return _readExtValue(port_mask, 2);
+    return _readExtValue(port_mask, false);
   }
 
   uint8_t Power_Class::getKeyState(void)
@@ -1616,6 +2048,25 @@ namespace m5
 
     case pmic_t::pmic_axp2101:
       return Axp2101.getPekPress();
+
+#if defined (CONFIG_IDF_TARGET_ESP32S3)
+
+    case pmic_t::pmic_py32pmic:
+      return PY32pmic.getPekPress();
+
+    case pmic_t::pmic_m5pm1:
+      {
+        // PM1 IRQ_STATUS3 (0x42): bit0=Click / bit1=Wakeup / bit2=DoubleClick
+        // (Long press is handled as power-off/reset by the PMIC hardware.)
+        uint8_t irq3 = M5.In_I2C.readRegister8(m5pm1_i2c_addr, 0x42, i2c_freq);
+        if (irq3 & ((1 << 0) | (1 << 2)))
+        { // a (double) click was detected; clear all button IRQ flags (write 0 to clear).
+          M5.In_I2C.writeRegister8(m5pm1_i2c_addr, 0x42, 0x00, i2c_freq);
+          return 2; // short clicked
+        }
+      }
+      return 0;
+#endif
 
 #endif
 
@@ -1646,6 +2097,27 @@ namespace m5
 
   void Power_Class::setVibration(uint8_t level)
   {
+#if !defined (M5UNIFIED_PC_BUILD) && defined (CONFIG_IDF_TARGET_ESP32S3)
+    if (M5.getBoard() == board_t::board_M5StopWatch)
+    {
+      // M5IOE1 PWM1 (0x1B/0x1C) -> pin IO9 / G9 motor; duty 12-bit in [11:0], EN=bit7 of high byte.
+      if (level == 0) {
+        uint8_t pwm_off[2] = { 0x00, 0x00 };
+        M5.In_I2C.writeRegister(m5ioe1_i2c_addr, 0x1B, pwm_off, sizeof(pwm_off), i2c_freq);
+      } else {
+        // PWM needs IO9 in output mode (M5IOE1 pin index 8 -> GPIO_MODE_H bit0).
+        M5.In_I2C.bitOff(m5ioe1_i2c_addr, 0x14, 0b00000001, i2c_freq);
+        M5.In_I2C.bitOn(m5ioe1_i2c_addr, 0x04, 0b00000001, i2c_freq);
+        uint16_t duty12 = static_cast<uint16_t>((static_cast<uint32_t>(level) * 0x0FFFu) / 255u);
+        uint8_t pwm_on[2] = {
+          static_cast<uint8_t>(duty12 & 0xFF),
+          static_cast<uint8_t>(((duty12 >> 8) & 0x0Fu) | 0x80u),
+        };
+        M5.In_I2C.writeRegister(m5ioe1_i2c_addr, 0x1B, pwm_on, sizeof(pwm_on), i2c_freq);
+      }
+      return;
+    }
+#endif
 #if !defined (CONFIG_IDF_TARGET) || defined (CONFIG_IDF_TARGET_ESP32)
     if (M5.getBoard() == board_t::board_M5StackCore2)
     {

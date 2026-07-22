@@ -101,7 +101,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 			payload["value"] = _buffer[_tx_idx.transmit].value.toInt();
 			break;
 		case TYPE_DOUBLE:
-			payload["value"] = _buffer[_tx_idx.transmit].value.toDouble();
+			payload["value"] = std::strtod(_buffer[_tx_idx.transmit].value.c_str(), nullptr);
 			break;
 		default:
 			payload["value"] = _buffer[_tx_idx.transmit].value;
@@ -180,7 +180,7 @@ IoTTx_Tx_Result IoTTxHTTP::transmit() {
 }
 
 IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 	enum IoTTx_Tx_Result result    = RESULT_TX_ERROR;
 	constexpr bool ENABLE_RECREATE = true;
 	Client *my_client              = nullptr;
@@ -251,15 +251,17 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 			static char *tmp_arr       = nullptr;
 			static size_t tmp_arr_size = 0;
 
+			// サイズ計算とエンコードの間に camera バッファが差し替わらないよう、
+			// 一括でロックを保持する（途中でロックを解放しない）
 			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			unsigned int len = base64::encodeLength(HAL.Camera.jpgImage.size());
-			HAL.giveSemaphoreMutex("camera");
 
 			if (tmp_arr_size < len + 1) {
 				delete[] tmp_arr;
 				tmp_arr = new char[len + 1]();
 				if (tmp_arr == nullptr) {
 					// メモリ確保に失敗した
+					HAL.giveSemaphoreMutex("camera");
 					debugMessage(LogCategory::HTTP_EX, LogLevel::Error,
 					             ("Failed alloc buffer. Size: " + String(len + 1)).c_str());
 					HAL.giveSemaphoreMutex(_mutex_key);
@@ -269,7 +271,6 @@ IoTTx_Tx_Result IoTTxHTTP::transmitEx() {
 			}
 			memset(tmp_arr, 0, tmp_arr_size);
 
-			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			base64::encode(&HAL.Camera.jpgImage[0], HAL.Camera.jpgImage.size(), tmp_arr);
 			HAL.giveSemaphoreMutex("camera");
 

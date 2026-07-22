@@ -381,4 +381,5 @@ void bt_mesh_rpl_init(void)
 				 "Failed to register bt_mesh_rpl conf");
 #endif
 }
+
 #endif /* MYNEWT_VAL(BLE_MESH) */

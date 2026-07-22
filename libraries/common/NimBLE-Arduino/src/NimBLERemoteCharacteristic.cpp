@@ -15,10 +15,9 @@
  * limitations under the License.
  */
 
-#include "nimconfig.h"
-#if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+#include "NimBLERemoteCharacteristic.h"
+#if CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL
 
-# include "NimBLERemoteCharacteristic.h"
 # include "NimBLERemoteDescriptor.h"
 # include "NimBLERemoteService.h"
 # include "NimBLEClient.h"
@@ -118,7 +117,7 @@ bool NimBLERemoteCharacteristic::retrieveDescriptors(NimBLEDescriptorFilter* pFi
     }
 
     auto prevDscCount = m_vDescriptors.size();
-    NimBLEUtils::taskWait(pFilter->taskData, BLE_NPL_TIME_FOREVER);
+    NimBLEUtils::taskWait(taskData, BLE_NPL_TIME_FOREVER);
     rc = ((NimBLETaskData*)pFilter->taskData)->m_flags;
     if (rc != BLE_HS_EDONE) {
         NIMBLE_LOGE(LOG_TAG, "<< retrieveDescriptors(): failed: rc=%d %s", rc, NimBLEUtils::returnCodeToString(rc));
@@ -388,4 +387,4 @@ NimBLEClient* NimBLERemoteCharacteristic::getClient() const {
     return getRemoteService()->getClient();
 } // getClient
 
-#endif /* CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL */
+#endif // CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL

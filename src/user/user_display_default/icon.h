@@ -3,6 +3,18 @@
 
 #include "../../hal/hal.h"
 
+extern const uint16_t BluetoothIconWidth;
+extern const uint16_t BluetoothIconHeight;
+extern const uint16_t BluetoothIcon_RLE_RunCount;
+extern const uint16_t BluetoothIcon_Palette[];
+extern const uint8_t BluetoothIcon_RLE_Packed[];
+
+extern const uint16_t DynamicspidIconWidth;
+extern const uint16_t DynamicspidIconHeight;
+extern const uint16_t DynamicspidIcon_RLE_RunCount;
+extern const uint16_t DynamicspidIcon_Palette[];
+extern const uint8_t DynamicspidIcon_RLE_Packed[];
+
 static constexpr float deg_to_rad = 0.017453292519943295769236907684886;
 
 inline void fill_arc_helper(int32_t cx, int32_t cy, int32_t oradius_x, int32_t iradius_x, int32_t oradius_y, int32_t iradius_y, float start, float end, uint16_t color) {
@@ -251,6 +263,45 @@ inline void Icon_BatteryStatus(int x, int y, int level) {
 	HAL.Display.fillRect(x + 4, y + 4, 5, 12, ((level >= 75) ? 0x07E0 : 0x0000));
 	HAL.Display.fillRect(x + 4 + 7, y + 4, 5, 12, ((level >= 25) ? 0x07E0 : 0x0000));
 	HAL.Display.fillRect(x + 4 + 14, y + 4, 5, 12, ((level < 25) ? 0xF800 : 0x07E0));
+}
+
+// パレット化RLE(ニブルパッキング)デコーダ。
+// 1バイト = [透過フラグ1bit][パレットindex 3bit][count 4bit]。
+// count==0(下位4bit)はエスケープを意味し、次の1バイトに実countを格納する。
+// 透過ランは描画をスキップし、カーソルだけ進める。
+inline void drawRLEIcon(int32_t x, int32_t y, int32_t w,
+                        const uint16_t *palette,
+                        const uint8_t *packed,
+                        uint16_t runCount) {
+	int32_t px = x, py = y;
+	uint32_t bytePos = 0;
+
+	for (uint16_t run = 0; run < runCount; run++) {
+		uint8_t b = pgm_read_byte(&packed[bytePos++]);
+
+		bool isTransparent = (b & 0x80) != 0;
+		uint8_t paletteIdx = (b >> 4) & 0x07;
+		uint8_t countLow   = b & 0x0F;
+
+		uint8_t count;
+		if (countLow == 0) {
+			count = pgm_read_byte(&packed[bytePos++]); // エスケープ: 実カウントは次バイト
+		} else {
+			count = countLow;
+		}
+
+		if (not isTransparent) {
+			uint16_t color = pgm_read_word(&palette[paletteIdx]);
+			HAL.Display.drawFastHLine(px, py, count, color);
+		}
+		// 透過ランは描画せずカーソルのみ進める
+
+		px += count;
+		if (px >= x + w) {
+			px = x;
+			py++;
+		}
+	}
 }
 
 #endif

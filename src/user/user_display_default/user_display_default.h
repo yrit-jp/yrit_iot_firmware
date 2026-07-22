@@ -6,14 +6,6 @@
 #include "../../display/display_timing_type_def.h"
 #include <OpenFontRender.h>
 
-extern const uint16_t BluetoothIconWidth;
-extern const uint16_t BluetoothIconHeight;
-extern const uint16_t BluetoothIcon[];
-
-extern const uint16_t DynamicspidIconWidth;
-extern const uint16_t DynamicspidIconHeight;
-extern const uint16_t DynamicspidIcon[];
-
 void cb_BeforeSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render, enum DisplayTiming dt);
 void cb_AfterSystemDisplayUpdate_Default(std::unique_ptr<OpenFontRender> &render, enum DisplayTiming dt);
 
@@ -46,6 +38,7 @@ void cb_AmbientBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int
 void cb_FtpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 void cb_HttpBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 void cb_MqttBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
+void cb_LoraBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 
 void cb_ReadMqttStatus_Default(std::unique_ptr<OpenFontRender> &render, int status);
 

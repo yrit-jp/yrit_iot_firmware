@@ -15,8 +15,9 @@ echo [2] ESP32 Devkit
 echo [3] M5Stack
 echo [4] LilyGO
 echo [5] Wio Terminal
-echo [6] キャンセル
-choice /c 123456 /n /m "プロファイルを選択: "
+echo [6] Wio Tracker 1110
+echo [7] キャンセル
+choice /c 1234567 /n /m "プロファイルを選択: "
 set PROFILE=%ERRORLEVEL%
 
 if "%PROFILE%" == "1" set SOURCE=%CD%\libraries\common
@@ -24,7 +25,8 @@ if "%PROFILE%" == "2" set SOURCE=%CD%\libraries\esp32_yrit_dev_board
 if "%PROFILE%" == "3" set SOURCE=%CD%\libraries\m5stack
 if "%PROFILE%" == "4" set SOURCE=%CD%\libraries\lilygo_t-display_s3_pro
 if "%PROFILE%" == "5" set SOURCE=%CD%\libraries\wio_terminal
-if "%PROFILE%" == "6" exit /b
+if "%PROFILE%" == "6" set SOURCE=%CD%\libraries\wio_tracker_1110
+if "%PROFILE%" == "7" exit /b
 
 echo 選択されたプロファイル: %SOURCE%
 echo.

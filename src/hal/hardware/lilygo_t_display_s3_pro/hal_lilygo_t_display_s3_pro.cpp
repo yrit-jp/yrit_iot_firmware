@@ -256,7 +256,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 
 	uint64_t chipid  = ESP.getEfuseMac();
 	char bt_name[20] = {0};
-	snprintf(bt_name, 20, "%llX", chipid);
+	snprintf(bt_name, 20, "%012llX", chipid);
 	return prefix + String(bt_name);
 }
 
@@ -854,7 +854,7 @@ bool HAL_NTP_RTC_API::getCurrentTime(struct tm *timeinfo) {
 
 bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
 	if (not FFat.begin(true)) {
-		HAL.println("Failed to begin SPIFFS.");
+		HAL.println("Failed to begin FFat.");
 		return false;
 	}
 
@@ -875,7 +875,7 @@ bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
 
 bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
 	if (not FFat.begin(true)) {
-		HAL.println("Failed to begin SPIFFS.");
+		HAL.println("Failed to begin FFat.");
 		return false;
 	}
 

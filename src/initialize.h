@@ -1,10 +1,10 @@
 #ifndef INITIALIZE_H
 #define INITIALIZE_H
 
-#include "firmware_version.h"
-
 #include "hal/hal.h"
+
 #include "ascii_art.h"
+#include "firmware_version.h"
 
 #include "./config/setting_parameters.h"
 #include "./display/display.h"
@@ -14,6 +14,7 @@
 #include "./transmit/iot_tx_ambient.h"
 #include "./transmit/iot_tx_ftp.h"
 #include "./transmit/iot_tx_http.h"
+#include "./transmit/iot_tx_lorawan.h"
 #include "./transmit/iot_tx_mqtt.h"
 #include "./transmit/tx_timing_helper.h"
 #include "sensor_type.h"
@@ -28,8 +29,11 @@ struct Features {
 	bool ftp_enable;
 	bool http_enable;
 	bool mqtt_enable;
+	bool lora_wan_enable;
 	bool batch_send_enable;
-	bool offline_mode;
+	bool needs_ip_network; // WiFi/LAN/NTP が必要な送信手段が有効かどうか
+	bool offline_mode;     // 送信手段が全て無効
+	bool sleep_enable;     // システムオンスリープが有効かどうか
 };
 
 struct TxEvent_t {
@@ -58,6 +62,7 @@ extern std::unique_ptr<IoTTxAmbient> tx_ambient;
 extern std::unique_ptr<IoTTxFTP> tx_ftp;
 extern std::unique_ptr<IoTTxHTTP> tx_http;
 extern std::unique_ptr<IoTTxMQTT> tx_mqtt;
+extern std::unique_ptr<IoTTxLoRaWAN> tx_lora_wan;
 extern std::vector<TransmitterEntry> transmitters;
 
 void InitializeLog(const char *save_dir);
@@ -78,6 +83,7 @@ void InitializeAmbient();
 void InitializeFTP();
 void InitializeHTTP();
 void InitializeMQTT();
+void InitializeLoRaWAN();
 
 struct Features ReadFeatures();
 void WaitStartTiming();

@@ -1,6 +1,81 @@
 # Changelog
 All notable changes to this project will be documented in this file.
 
+## [2.3.6] 2025-09-05
+
+## Fixed
+- NimBLEAdvertisedDevice::isConnectable returning incorrect result.
+- Extended advertisements not reporting full data.
+
+## Added
+- Support up to 1650 bytes of advertisement with extended advertising.
+
+## [2.3.5] 2025-09-02
+
+## Fixed
+- esp32c3/s3 max connections not being properly applied.
+
+## [2.3.4] 2025-08-10
+
+## Fixed
+- `NimBLEClientCallbacks::OnConnectFail` not called when connection not established.
+- Removed invalid reference to refactored original examples in README.md.
+- Cleanup redefinition warnings for arduino core 3.3+.
+
+## [2.3.3] 2025-07-27
+
+## Fixed
+- Multiple definition errors for some functions with esp32c6/h2/c2 with Arduino core 3.3+.
+
+## [2.3.2] 2025-06-27
+
+## Fixed
+- Max connections not being applied correctly above 4.
+- Build errors with arduino cores using IDF v4.x
+- `onConnect` callback not being called when the status is `BLE_ERR_UNSUPP_REM_FEATURE`, workaround for upstream issue.
+
+## Changed
+- FreeRTOS port uses the old porting layer for all but the latest esp32 mcus.
+- By default BLE secure connections is disabled now to reduce issues when it's enabled but not used by the application.
+- BLE mesh files are now only compiled if mesh is enabled in the project configuration.
+
+## [2.3.1] 2025-06-11
+
+## Fixed
+- EddystoneTLM example not setting the data.
+- Build errors when disabling BLE roles.
+- esp32c2 build issues due to multiple definitions of various functions.
+- `NimBLEClient::readValue` call not returning when the instance was created with a`NimBLEServer` and reading a secured characteristic.
+- `NimBLEScan` destructor potentially causing a crash.
+
+## Added
+- iBeacon example.
+- `NimBLEBeacon::BeaconData` `std::vector<uint8_t>` operator to allow it to be used as a parameter to `NimBLEAdvertisementData::setManufacturerData`.
+
+## [2.3.0] 2025-05-19
+
+## Fixed
+- Incorrect `NimBLECharacteristic::onSubscribe` value when indications are set.
+- `NimBLECharacteristic::onRead` callback not called in some cases.
+- Clear attribute value when zero length value is written.
+- Notify/Indicate incorrectly returning success with custom value.
+- Corrected NimBLEClient array initialization.
+- Prevent potential exception when scan is restarted.
+- Attribute getValue failing with some data types
+- Incorrectly passing a pointer to a function taking const reference.
+
+## Added
+- Support for esp32c2, esp32c5, esp32c6, esp32h2
+- L2CAP infrastructure.
+- Scan duplicate cache reset time.
+
+## Changed
+- Cleaned up examples.
+- Update nimble core to esp-nimble @70439dd.
+- Disable flow control for all targets except original esp32.
+- Allow PHY updates without enabling extended advertising.
+- Reduced iram usage
+
 ## [2.2.3] 2025-02-28
 
 ## Fixed

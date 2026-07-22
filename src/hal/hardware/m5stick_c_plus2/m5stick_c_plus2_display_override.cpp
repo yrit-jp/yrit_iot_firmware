@@ -23,18 +23,18 @@ volatile bool PlayLoadAnimation = false;
 TaskHandle_t LoadAnimationTask;
 void loadAnimationLoop(void *pvParameters) {
 	// Animation parameters
-	const uint16_t START_X = 60;
-	const uint16_t START_Y = 70;
-	const uint8_t ROTATION_SPEED = 2;
-	const uint8_t DOT_RADIUS = 3;
-	const uint8_t DOT_SPACING = 30;
-	const uint8_t NUM_DOTS = 5;
+	const uint16_t START_X         = 60;
+	const uint16_t START_Y         = 70;
+	const uint8_t ROTATION_SPEED   = 2;
+	const uint8_t DOT_RADIUS       = 3;
+	const uint8_t DOT_SPACING      = 30;
+	const uint8_t NUM_DOTS         = 5;
 	const uint8_t PHASE_ANGLE_STEP = 90 / NUM_DOTS;
-	const uint8_t BASE_DELAY = 15;
-	const uint8_t DELAY_VARIATION = 5;
-	const uint16_t MAX_ANGLE = 180;
-	const uint8_t COLOR_BASE = 10;
-	const uint8_t MAX_BRIGHTNESS = 255;
+	const uint8_t BASE_DELAY       = 15;
+	const uint8_t DELAY_VARIATION  = 5;
+	const uint16_t MAX_ANGLE       = 180;
+	const uint8_t COLOR_BASE       = 10;
+	const uint8_t MAX_BRIGHTNESS   = 255;
 
 	int16_t angle_degrees = 0;
 
@@ -220,7 +220,7 @@ void updateDisplayOverrideBottom(std::unique_ptr<OpenFontRender> &render,
 
 		render->setFontSize(13);
 		render->setFontColor(TFT_ORANGE);
-		render->printf("- M5Stick C Plus Edition -\n");
+		render->printf("- M5Stick C Plus2 Edition -\n");
 		render->setFontColor(TFT_WHITE);
 		HAL.Display.giveSemaphoreMutex(); // Give (release) mutex semaphore
 

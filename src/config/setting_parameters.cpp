@@ -30,10 +30,12 @@ JsonDocument commonSettingTemplate() {
 	}
 
 	{
-		JsonObject PARAM         = doc["PARAM"].to<JsonObject>();
-		PARAM["devID"]           = "99_99";
-		PARAM["WAIT_00_SEC"]     = "false";
-		PARAM["BATCH_DATA_SEND"] = "false";
+		JsonObject PARAM = doc["PARAM"].to<JsonObject>();
+		PARAM["devID"]   = "99_99";
+		if (doc["WIFI"] || doc["LAN"]) {
+			PARAM["WAIT_00_SEC"]     = "false";
+			PARAM["BATCH_DATA_SEND"] = "false";
+		}
 		PARAM["TX_INTERVAL_SEC"] = "5";
 
 		JsonObject SAMPLING = doc["SAMPLING"].to<JsonObject>();
@@ -62,6 +64,12 @@ JsonDocument commonSettingTemplate() {
 		JsonDocument mqtt = mqttSettingTemplate();
 		mergeJson(doc.as<JsonVariant>(), mqtt.as<JsonVariant>());
 		// mqtt.~BasicJsonDocument();
+	}
+
+	{
+		JsonObject I2C_PORT1           = doc["I2C_PORT1"].to<JsonObject>();
+		I2C_PORT1["IGNORE_ADDR_REGEX"] = "";
+		I2C_PORT1["IGNORE_NAME_REGEX"] = "";
 	}
 
 	return doc;

@@ -15,13 +15,13 @@
 #include <errno.h>
 #include <stdbool.h>
 
-#include "../include/mesh/mesh.h"
+#include "nimble/nimble/host/mesh/include/mesh/mesh.h"
 #include "mesh_priv.h"
 #include "adv.h"
 #include "net.h"
 #include "transport.h"
 #include "foundation.h"
-#include "../include/mesh/health_cli.h"
+#include "nimble/nimble/host/mesh/include/mesh/health_cli.h"
 
 static int32_t msg_timeout = K_SECONDS(5);
 
@@ -525,4 +525,5 @@ static int health_cli_init(struct bt_mesh_model *model)
 const struct bt_mesh_model_cb bt_mesh_health_cli_cb = {
 	.init = health_cli_init,
 };
-#endif
+
+#endif /* MYNEWT_VAL(BLE_MESH) */

@@ -36,7 +36,7 @@ void cb_UpdateI2cValueInt(std::unique_ptr<OpenFontRender> &render,
         render->setCursor(10, 200);
         render->setFontColor(TFT_RED, TFT_BLACK);
         render->printf("WARNING: High value!");
-        HAL.Display.returnSemaphoreMutex();
+        HAL.Display.giveSemaphoreMutex();
     }
 }
 ```
@@ -77,7 +77,7 @@ void cb_UpdateI2cValueInt(...) {
     // その後に追加の描画処理
     HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
     // ... 追加の描画 ...
-    HAL.Display.returnSemaphoreMutex();
+    HAL.Display.giveSemaphoreMutex();
 }
 ```
 
@@ -94,7 +94,7 @@ void cb_UpdateI2cValueInt(...) {
     render->setFontColor(TFT_CYAN, TFT_BLACK);
     render->printf("%s: %d %s", sensor_name, value, unit);
 
-    HAL.Display.returnSemaphoreMutex();
+    HAL.Display.giveSemaphoreMutex();
 }
 ```
 
@@ -105,7 +105,7 @@ void cb_UpdateI2cValueInt(...) {
 ```cpp
 HAL.Display.takeSemaphoreMutex(portMAX_DELAY);  // 開始
 // ... 描画処理 ...
-HAL.Display.returnSemaphoreMutex();             // 終了
+HAL.Display.giveSemaphoreMutex();             // 終了
 ```
 
 これを忘れると、マルチタスク環境で画面表示が乱れます。
@@ -237,7 +237,7 @@ void cb_UpdateI2cValueDouble(std::unique_ptr<OpenFontRender> &render,
         render->setCursor(60, 80);
         render->setFontColor(TFT_YELLOW, TFT_BLACK);
         render->printf("%.1f%s", value, unit);
-        HAL.Display.returnSemaphoreMutex();
+        HAL.Display.giveSemaphoreMutex();
     } else {
         // その他はデフォルト
         cb_UpdateI2cValueDouble_Default(render, sensor_name, value, unit, selected);
@@ -265,7 +265,7 @@ void cb_UpdateI2cValueInt(std::unique_ptr<OpenFontRender> &render,
     render->setCursor(50, 100);
     render->setFontColor(color, TFT_BLACK);
     render->printf("%s: %d %s", sensor_name, value, unit);
-    HAL.Display.returnSemaphoreMutex();
+    HAL.Display.giveSemaphoreMutex();
 }
 ```
 
@@ -293,7 +293,7 @@ void cb_SystemReady(std::unique_ptr<OpenFontRender> &render,
     render->setFontColor(TFT_GREENYELLOW, TFT_NAVY);
     render->printf("Sensors: %d", sensor_num);
 
-    HAL.Display.returnSemaphoreMutex();
+    HAL.Display.giveSemaphoreMutex();
 
     HAL.delay(3000);
 }
@@ -315,7 +315,7 @@ void cb_MqttBufferUpdate(std::unique_ptr<OpenFontRender> &render,
     render->setCursor(255, 210);
     render->setFontColor(TFT_BLACK, color);
     render->printf("MQTT:%d", remain_data_quantity);
-    HAL.Display.returnSemaphoreMutex();
+    HAL.Display.giveSemaphoreMutex();
 }
 ```
 
@@ -350,7 +350,7 @@ int y = render->getCursorY();
 ```cpp
 // ミューテックス管理（必須）
 HAL.Display.takeSemaphoreMutex(portMAX_DELAY);
-HAL.Display.returnSemaphoreMutex();
+HAL.Display.giveSemaphoreMutex();
 
 // 図形描画
 HAL.Display.fillRect(x, y, width, height, color);   // 矩形塗りつぶし

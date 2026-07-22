@@ -17,8 +17,9 @@
 
 #ifndef NIMBLE_CPP_CHARACTERISTIC_H_
 #define NIMBLE_CPP_CHARACTERISTIC_H_
+
 #include "nimconfig.h"
-#if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BT_NIMBLE_ROLE_PERIPHERAL)
+#if CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
 
 class NimBLECharacteristicCallbacks;
 class NimBLEService;
@@ -87,7 +88,9 @@ class NimBLECharacteristic : public NimBLELocalValueAttribute {
 #  ifdef _DOXYGEN_
     bool
 #  else
-    typename std::enable_if<!std::is_pointer<T>::value && !Has_c_str_length<T>::value && !Has_data_size<T>::value, bool>::type
+    typename std::enable_if<!std::is_pointer<T>::value && !std::is_array<T>::value && !Has_c_str_length<T>::value &&
+                                !Has_data_size<T>::value,
+                            bool>::type
 #  endif
     notify(const T& v, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE) const {
         return notify(reinterpret_cast<const uint8_t*>(&v), sizeof(T), connHandle);
@@ -133,7 +136,9 @@ class NimBLECharacteristic : public NimBLELocalValueAttribute {
 #  ifdef _DOXYGEN_
     bool
 #  else
-    typename std::enable_if<!std::is_pointer<T>::value && !Has_c_str_length<T>::value && !Has_data_size<T>::value, bool>::type
+    typename std::enable_if<!std::is_pointer<T>::value && !std::is_array<T>::value && !Has_c_str_length<T>::value &&
+                                !Has_data_size<T>::value,
+                            bool>::type
 #  endif
     indicate(const T& v, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE) const {
         return indicate(reinterpret_cast<const uint8_t*>(&v), sizeof(T), connHandle);
@@ -182,8 +187,8 @@ class NimBLECharacteristic : public NimBLELocalValueAttribute {
      * @note This function is only available if the type T is not a pointer.
      */
     template <typename T>
-    typename std::enable_if<!std::is_pointer<T>::value, bool>::type notify(const T& value,
-                                                                           uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE) const {
+    typename std::enable_if<!std::is_pointer<T>::value && !std::is_array<T>::value, bool>::type notify(
+        const T& value, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE) const {
         if constexpr (Has_data_size<T>::value) {
             return notify(reinterpret_cast<const uint8_t*>(value.data()), value.size(), connHandle);
         } else if constexpr (Has_c_str_length<T>::value) {
@@ -204,7 +209,7 @@ class NimBLECharacteristic : public NimBLELocalValueAttribute {
      * @note This function is only available if the type T is not a pointer.
      */
     template <typename T>
-    typename std::enable_if<!std::is_pointer<T>::value, bool>::type indicate(
+    typename std::enable_if<!std::is_pointer<T>::value && !std::is_array<T>::value, bool>::type indicate(
         const T& value, uint16_t connHandle = BLE_HS_CONN_HANDLE_NONE) const {
         if constexpr (Has_data_size<T>::value) {
             return indicate(reinterpret_cast<const uint8_t*>(value.data()), value.size(), connHandle);
@@ -249,5 +254,5 @@ class NimBLECharacteristicCallbacks {
     virtual void onSubscribe(NimBLECharacteristic* pCharacteristic, NimBLEConnInfo& connInfo, uint16_t subValue);
 };
 
-#endif /* CONFIG_BT_ENABLED  && CONFIG_BT_NIMBLE_ROLE_PERIPHERAL */
-#endif /*NIMBLE_CPP_CHARACTERISTIC_H_*/
+#endif // CONFIG_BT_ENABLED  && CONFIG_BT_NIMBLE_ROLE_PERIPHERAL
+#endif // NIMBLE_CPP_CHARACTERISTIC_H_

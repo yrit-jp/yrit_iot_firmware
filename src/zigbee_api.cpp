@@ -194,8 +194,20 @@ enum ZigbeeApiStatus SettingBT::update() {
 	}
 	if (frame.idx == 3) {
 		/* Set length */
-		frame.data_len  = (uint16_t)(frame.packet[1] << 8) + frame.packet[2];
-		frame.frame_len = frame.data_len + 4; // start delimiter, len(msb), len(lsb), checksum
+		// uint16_t のまま加算するとオーバーフローで frame_len が小さくラップし、
+		// 直後の calcCheckSum / getRecvData でバッファ外を読み書きしてしまうため、
+		// 一旦 uint32_t で計算してからバッファサイズを超えないか検証する
+		uint32_t declared_len = (static_cast<uint32_t>(frame.packet[1]) << 8) + frame.packet[2];
+		uint32_t total_len    = declared_len + 4; // start delimiter, len(msb), len(lsb), checksum
+
+		if (total_len > ZIGBEE_API_MAX_FRAME_SIZE) {
+			HAL.println("[Error] Invalid frame length (exceeds buffer size)");
+			clearRawFrame(&frame);
+			return frame.status;
+		}
+
+		frame.data_len  = (uint16_t)declared_len;
+		frame.frame_len = (uint16_t)total_len;
 		HAL.printf("Frame Size: %d\n", frame.frame_len);
 		// HAL.printf("%d %d\n", frame.idx, frame.frame_len);
 	}

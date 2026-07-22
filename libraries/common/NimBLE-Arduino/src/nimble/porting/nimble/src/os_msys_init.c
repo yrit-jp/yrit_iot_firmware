@@ -17,13 +17,17 @@
  * under the License.
  */
 
-#include <assert.h>
-#include "../include/os/os.h"
-#include "../include/mem/mem.h"
-#include "../include/sysinit/sysinit.h"
+#include "syscfg/syscfg.h"
 
-#include "nimble/esp_port/port/include/esp_nimble_mem.h"
+#if !CONFIG_BT_LE_CONTROLLER_NPL_OS_PORTING_SUPPORT
+
+#include <assert.h>
+#include "nimble/porting/nimble/include/os/os.h"
+#include "nimble/porting/nimble/include/mem/mem.h"
+#include "nimble/porting/nimble/include/sysinit/sysinit.h"
+
 #ifdef ESP_PLATFORM
+#include "nimble/esp_port/port/include/esp_nimble_mem.h"
 #include "esp_err.h"
 #endif
 
@@ -94,7 +98,7 @@ static struct os_sanity_check os_msys_sc;
  * @return                      The msys pool's minimum safe buffer count.
  */
 static int
-IRAM_ATTR os_msys_sanity_min_count(int idx)
+os_msys_sanity_min_count(int idx)
 {
     switch (idx) {
     case 0:
@@ -110,7 +114,7 @@ IRAM_ATTR os_msys_sanity_min_count(int idx)
 }
 
 static int
-IRAM_ATTR os_msys_sanity(struct os_sanity_check *sc, void *arg)
+os_msys_sanity(struct os_sanity_check *sc, void *arg)
 {
     const struct os_mbuf_pool *omp;
     int min_count;
@@ -220,3 +224,5 @@ void os_msys_init(void)
     SYSINIT_PANIC_ASSERT(rc == 0);
 #endif
 }
+
+#endif

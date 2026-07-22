@@ -32,24 +32,31 @@ void setup() {
 	// Initialize Internal Parameters
 	InitializeSettingParameter();
 
-	// Display Farmware verion
-	uint8_t hold_sec = 3;
-	updateDisplay(DisplayTiming::DISPLAY_FW_VERSION,
-	              param_manager.getParameter<const char *>("PARAM", "devID"),
-	              APP_MAIN_VERSION,
-	              APP_MINOR_VERSION,
-	              APP_RELEASE_TAG,
-	              hold_sec);
-	HAL.Info.DEVICE_ID     = param_manager.getParameter<const char *>("PARAM", "devID");
-	HAL.Info.V_MAIN        = APP_MAIN_VERSION;
-	HAL.Info.V_MINOR       = APP_MINOR_VERSION;
-	HAL.Info.V_RELEASE_TAG = APP_RELEASE_TAG;
+	// Read features
+	features = ReadFeatures();
+
+	if (features.sleep_enable) {
+		// スリープが有効の場合は省電力モードに切り替えられる
+		HAL.setPowerMode(features.needs_ip_network);
+	}
+
+	if (not HAL.isWakeFromSleep()) {
+		// Display Farmware verion
+		uint8_t hold_sec = 3;
+		updateDisplay(DisplayTiming::DISPLAY_FW_VERSION,
+		              param_manager.getParameter<const char *>("PARAM", "devID"),
+		              APP_MAIN_VERSION,
+		              APP_MINOR_VERSION,
+		              APP_RELEASE_TAG,
+		              hold_sec);
+		HAL.Info.DEVICE_ID     = param_manager.getParameter<const char *>("PARAM", "devID");
+		HAL.Info.V_MAIN        = APP_MAIN_VERSION;
+		HAL.Info.V_MINOR       = APP_MINOR_VERSION;
+		HAL.Info.V_RELEASE_TAG = APP_RELEASE_TAG;
+	}
 
 	// Initialize LED
 	InitializeLed();
-
-	// Read features
-	features = ReadFeatures();
 
 	// Initialize GPIO
 	InitializeGPIO();
@@ -73,7 +80,7 @@ void setup() {
 	InitializeCameraDevice();
 
 	struct tm timeinfo = {0};
-	if (not features.offline_mode) {
+	if (features.needs_ip_network) {
 		if (HAL.getUseLinkLayer() == DATALINK_LAYER::UNKNOWN) {
 			// Initialize Wired LAN
 			InitializeWiredLan();
@@ -93,7 +100,7 @@ void setup() {
 			HAL.delay(10000);
 			HAL.reboot();
 		}
-	} else {
+	} else if (features.offline_mode) {
 		// Offline mode
 		updateDisplay(DisplayTiming::DISPLAY_OFFLINE_MODE);
 		HAL.delay(3000);
@@ -122,6 +129,7 @@ void setup() {
 		transmitters.push_back(entry);
 	}
 	if (features.http_enable) {
+		// HTTP initialize
 		InitializeHTTP();
 		TransmitterEntry entry;
 		entry.tx                           = tx_http.get();
@@ -142,6 +150,17 @@ void setup() {
 		entry.display_timing.init_done     = DisplayTiming::MQTT_INIT_DONE;
 		transmitters.push_back(entry);
 	}
+	if (features.lora_wan_enable) {
+		// LoRaWAN initialize
+		InitializeLoRaWAN();
+		TransmitterEntry entry;
+		entry.tx                           = tx_lora_wan.get();
+		entry.display_timing.init_begin    = DisplayTiming::LORA_WAN_INIT_BEGIN;
+		entry.display_timing.connect_wifi  = DisplayTiming::LORA_WAN_JOIN_BEGIN;
+		entry.display_timing.buffer_update = DisplayTiming::LORA_WAN_BUFFER_UPDATE;
+		entry.display_timing.init_done     = DisplayTiming::LORA_WAN_INIT_DONE;
+		transmitters.push_back(entry);
+	}
 
 	// 全トランスミッターのハートビートを更新
 	for (auto &entry : transmitters) {
@@ -151,7 +170,7 @@ void setup() {
 	// Initialize timer interrupt
 	InitializeTimerInterrupt();
 
-	HAL.Led_Status.off();
+	HAL.Led_Status.on();
 	HAL.Led_Warning.off();
 	updateDisplay(DisplayTiming::SYSTEM_INIT_DONE,
 	              param_manager.getParameter<const char *>("PARAM", "devID"),
@@ -174,10 +193,12 @@ void setup() {
 	HAL.Log.loggingStop();
 	InitializeLog("/DEBUG_LOG/LOOP");
 
-	// Create Transmit Task
-	HAL_REGISTER_TRANSMIT_TASK();
+	if (not features.sleep_enable) {
+		// Create Transmit Task
+		HAL_REGISTER_TRANSMIT_TASK();
+	}
 
-	if (not features.offline_mode) {
+	if (features.needs_ip_network) {
 		if (features.wait_enable) {
 			WaitStartTiming();
 		}
@@ -187,6 +208,8 @@ void setup() {
 			// TODO: Error handling
 		}
 		TxTimingHelper::begin(timeinfo, HAL.Info.TX_INTERVAL_SEC);
+	} else if (features.lora_wan_enable) {
+		HAL.Timer1.addSubTimer("transmit", HAL.Info.TX_INTERVAL_SEC, HAL.Info.TX_INTERVAL_SEC);
 	}
 
 	constexpr bool ENABLE_FIRST_INTERRUPT  = true;
@@ -221,7 +244,7 @@ void loop() {
 		// Interrupt every 100 ms
 		// HAL.println("Interrupted OK Timer2");
 
-		if (not features.offline_mode) {
+		if (features.needs_ip_network) {
 			if (not HAL.NtpRtc.getCurrentTime(&timeinfo)) {
 				HAL.println("Get localtime error");
 				return;
@@ -236,6 +259,7 @@ void loop() {
 
 	if (HAL.Timer1.interrupted()) {
 		// Interrupt every 1 second
+		// HAL.println("Interrupted OK Timer1");
 
 		if (HAL.Timer1.checkSubTimer("one_minutes") == true) {
 			// About every 1 minutes
@@ -257,8 +281,15 @@ void loop() {
 			HAL.preventBatterySleep(HAL.Timer1.checkSubTimer("wake_battery"));
 		}
 
+		if (features.lora_wan_enable and not features.needs_ip_network) {
+			if (HAL.Timer1.checkSubTimer("transmit") == true) {
+				txEventFlag.transmit = true;
+			}
+		}
+
 		updateDisplay(DisplayTiming::EVERY_ONE_SECONDS_EVENT);
 		HAL.Log.flush();
+		HAL.Led_Status.toggle();
 		interactiveAdminControl();
 		HAL.delay(5);
 	}
@@ -328,7 +359,32 @@ void loop() {
 		txEventFlag.link_modbus        = false;
 	}
 
-	HAL.delay(10);
+	if (features.sleep_enable and (not features.offline_mode)) {
+		void *TX_LOOP_EXPLICIT = (void *)1; // 明示的な1回呼び出し
+
+		constexpr uint8_t MAX_RETRY = 3;
+		for (uint8_t i = 0; i < MAX_RETRY; i++) {
+			transmitLoop(TX_LOOP_EXPLICIT);
+
+			bool has_pending = false;
+			for (auto &entry : transmitters) {
+				if (entry.tx->getPendingDataQuantity() > 0) {
+					has_pending = true;
+					break;
+				}
+			}
+			if (not has_pending) {
+				break;
+			}
+			HAL.printf("Tx failed, retry %d/%d\n", i + 1, MAX_RETRY);
+			HAL.delay(1000);
+		}
+
+		HAL.system_sleep(HAL.Info.TX_INTERVAL_SEC * 1000);
+		txEventFlag.transmit = true;
+	} else {
+		HAL.delay(10);
+	}
 }
 
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
@@ -365,11 +421,17 @@ void userInteractiveLoop(void *pvParameters) {
 
 // ==================================================================
 //! @brief ストアしたデータの送信処理タスク
-//! @param[in] (pvParameters) 未使用
+//! @param[in] (pvParameters) 単一呼び出しの場合は nullptr 以外を渡す
 //! @see  storeValue
 // ==================================================================
 void transmitLoop(void *pvParameters) {
+	const bool single_shot = (pvParameters != nullptr);
+
 	if (features.offline_mode) {
+		if (single_shot) {
+			return;
+		}
+
 		while (true) {
 			HAL.delay(1000);
 			if (HAL.Timer1.checkSubTimer("one_seconds_in_transmit") == true) {
@@ -407,6 +469,10 @@ void transmitLoop(void *pvParameters) {
 			}
 		}
 		/* Update Display END */
+
+		if (single_shot) {
+			break;
+		}
 
 		/* periodic process */
 		if (HAL.Timer1.checkSubTimer("one_seconds_in_transmit") == true) {
@@ -594,7 +660,7 @@ void updateValue(uint16_t target, int target_index) {
 				sensors[i].s_value.latest = s_data;
 			}
 		} else if (sensors[i].type == TYPE_CAMERA) {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 			sensors[i].CAMERA.captured = false;
 
 			if (sensors[i].display == false and
@@ -764,13 +830,13 @@ void storeValue(struct tm timeinfo) {
 }
 
 // ==================================================================
-//! @brief センサ値を FIFO リングバッファに格納する
+//! @brief カメラ画像やバッチ送信用JSONなど、容量が大きい特殊データを格納する
 //! @param[in] (timeinfo) センサ値取得時間
-//! @see updateValue, transmitLoop, Sensor, IoTTxFTP, IoTTxMQTT
-//! @note 全てのデータは格納時には文字列に変換されます。
+//! @see updateValue, transmitLoop, storeValue, Sensor, IoTTxFTP, IoTTxMQTT
+//! @note 定期送信タイミングでのみ呼び出される（storeValue とは別の Ex 用バッファに格納）。
 // ==================================================================
 void storeExceptionalValue(struct tm timeinfo) {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 	if (not features.batch_send_enable and
 	    not features.camera_enable) {
 		return;

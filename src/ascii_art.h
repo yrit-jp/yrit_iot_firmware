@@ -1,7 +1,7 @@
 #ifndef ASCII_ART_H
 #define ASCII_ART_H
 
-#ifdef ENABLE_ASCII_ART
+#if ENABLE_ASCII_ART
 
 static constexpr const char* ASCII_ART = R"(
  ___________________________________________________________________________

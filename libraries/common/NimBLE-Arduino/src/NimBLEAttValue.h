@@ -17,8 +17,9 @@
 
 #ifndef NIMBLE_CPP_ATTVALUE_H
 #define NIMBLE_CPP_ATTVALUE_H
+
 #include "nimconfig.h"
-#if defined(CONFIG_BT_ENABLED)
+#if CONFIG_BT_ENABLED
 
 # ifdef NIMBLE_CPP_ARDUINO_STRING_AVAILABLE
 #  include <Arduino.h>
@@ -305,9 +306,6 @@ class NimBLEAttValue {
      */
     template <typename T>
     T getValue(time_t* timestamp = nullptr, bool skipSizeCheck = false) const {
-        if (!skipSizeCheck && size() < sizeof(T)) {
-            return T();
-        }
         if (timestamp != nullptr) {
 # if CONFIG_NIMBLE_CPP_ATT_VALUE_TIMESTAMP_ENABLED
             *timestamp = m_timestamp;
@@ -316,6 +314,9 @@ class NimBLEAttValue {
 # endif
         }
 
+        if (!skipSizeCheck && size() < sizeof(T)) {
+            return T();
+        }
         return *(reinterpret_cast<const T*>(m_attr_value));
     }
 
@@ -362,5 +363,5 @@ class NimBLEAttValue {
 # endif
 };
 
-#endif /*(CONFIG_BT_ENABLED) */
-#endif /* NIMBLE_CPP_ATTVALUE_H_ */
+#endif // CONFIG_BT_ENABLED
+#endif // NIMBLE_CPP_ATTVALUE_H_

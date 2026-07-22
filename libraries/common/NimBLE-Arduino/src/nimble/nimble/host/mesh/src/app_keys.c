@@ -10,7 +10,7 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include "../include/mesh/mesh.h"
+#include "nimble/nimble/host/mesh/include/mesh/mesh.h"
 #include "mesh_priv.h"
 #include "net.h"
 #include "app_keys.h"
@@ -718,4 +718,5 @@ void bt_mesh_app_key_init(void)
 				 "Failed to register bt_mesh_app_key conf");
 #endif
 }
+
 #endif /* MYNEWT_VAL(BLE_MESH) */

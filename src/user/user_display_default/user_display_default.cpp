@@ -73,6 +73,9 @@ __attribute__((weak)) void cb_MqttBufferUpdate_Default(std::unique_ptr<OpenFontR
 __attribute__((weak)) void cb_AmbientBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
 }
 
+__attribute__((weak)) void cb_LoraBufferUpdate_Default(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
+}
+
 __attribute__((weak)) void cb_ReadMqttStatus_Default(std::unique_ptr<OpenFontRender> &render, int status) {
 }
 

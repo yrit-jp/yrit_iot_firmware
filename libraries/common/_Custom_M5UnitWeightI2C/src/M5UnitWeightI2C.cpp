@@ -7,7 +7,7 @@ bool M5UnitWeightI2C::begin(TwoWire *wire, uint8_t sda, uint8_t scl,
     _sda   = sda;
     _scl   = scl;
     _speed = speed;
-    _wire->begin(_sda, _scl);
+    //_wire->begin(_sda, _scl);
     _wire->setClock(_speed);
     delay(10);
     _wire->beginTransmission(_addr);

@@ -12,10 +12,9 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <Client.h>
-#include <DFRobot_RTU.h>
-#include <Wire.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstdlib>
 #include <map>
 #include <memory>
 #include <set>
@@ -155,12 +154,14 @@ public:
 	// ==============================================================
 	//! @brief ハードウェア依存機能の初期化を行います
 	// =============================================================
-	virtual void begin() = 0;
+	virtual void begin() {
+	}
 
 	// ==============================================================
 	//! @brief ループごとに呼び出す処理を実行します
 	// =============================================================
-	virtual void update() = 0;
+	virtual void update() {
+	}
 
 	// ==============================================================
 	//! @brief 指定した時間内にボタンが押されるかを監視する
@@ -168,54 +169,97 @@ public:
 	//! @return 押されたボタンのビットフラグ（PRESSED_BUTTON）
 	//! @see PRESSED_BUTTON
 	// =============================================================
-	virtual uint8_t waitForButtonPressed(uint16_t wait_ms) = 0;
+	virtual uint8_t waitForButtonPressed(uint16_t wait_ms) {
+		return static_cast<uint8_t>(PRESSED_BUTTON::NONE);
+	}
 
 	// ==============================================================
 	//! @brief ボタンAが押されたかを取得する
 	//! @return 押されたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnA_wasPressed() = 0;
+	virtual uint8_t BtnA_wasPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief ボタンBが押されたかを取得する
 	//! @return 押されたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnB_wasPressed() = 0;
+	virtual uint8_t BtnB_wasPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief ボタンCが押されたかを取得する
 	//! @return 押されたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnC_wasPressed() = 0;
+	virtual uint8_t BtnC_wasPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief ボタンAが押されているかを取得する
 	//! @return 押されていたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnA_isPressed() = 0;
+	virtual uint8_t BtnA_isPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief ボタンBが押されているかを取得する
 	//! @return 押されていたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnB_isPressed() = 0;
+	virtual uint8_t BtnB_isPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief ボタンCが押されているかを取得する
 	//! @return 押されていたら HIGH, それ以外は LOW を返す
 	// =============================================================
-	virtual uint8_t BtnC_isPressed() = 0;
+	virtual uint8_t BtnC_isPressed() {
+		return LOW;
+	}
 
 	// ==============================================================
 	//! @brief チップのUUIDを取得する
 	//! @return チップのUUID文字列を返す
 	// =============================================================
-	virtual String getChipUUID(bool include_prefix = true) = 0;
+	virtual String getChipUUID(bool include_prefix = true) {
+		return "dummy_uuid";
+	}
 
 	// ==============================================================
 	//! @brief システムを再起動します
 	// =============================================================
-	virtual void reboot() = 0;
+	virtual void reboot() {
+	}
+
+	// ==============================================================
+	//! @brief システムをスリープします
+	//! @param[in] (ms) 待機時間（ミリ秒）
+	//! @note スリープの種別は実装に依存します。
+	//! @note Deep-sleep の場合は処理は継続されず、復帰後は再起動します。
+	// =============================================================
+	virtual void system_sleep(uint32_t ms) {
+		::delay(ms);
+	}
+
+	// ==============================================================
+	//! @brief スリープからの復帰かどうかを返します
+	//! @return true: スリープ復帰、false: コールドブート
+	// =============================================================
+	virtual bool isWakeFromSleep() {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief 省電力設定を行います
+	//! @param[in] (wifi_required) WiFi/BT を使用する場合 true
+	// =============================================================
+	virtual void setPowerMode(bool wifi_required) {
+		(void)wifi_required;
+	}
 
 	// ==============================================================
 	//! @brief 指定された時間待ちます
@@ -314,6 +358,7 @@ public:
 		::va_end(args);
 
 		Serial.print(s);
+		Serial.flush();
 	}
 
 	// ==============================================================
@@ -322,6 +367,7 @@ public:
 	// =============================================================
 	virtual void println(const char *s) {
 		Serial.println(s);
+		Serial.flush();
 	}
 
 	// ==============================================================
@@ -330,6 +376,7 @@ public:
 	// =============================================================
 	virtual void print(const char *s) {
 		Serial.print(s);
+		Serial.flush();
 	}
 
 	// ==============================================================
@@ -667,6 +714,54 @@ public:
 		return;
 	}
 
+	virtual void setCursor(int32_t x, int32_t y) {
+		// Empty
+		return;
+	}
+
+	virtual int32_t getCursorX() {
+		// Empty
+		return 0;
+	}
+
+	virtual int32_t getCursorY() {
+		// Empty
+		return 0;
+	}
+
+	virtual void setTextColor(uint16_t color) {
+		// Empty
+		return;
+	}
+
+	virtual void setTextColor(uint16_t fgcolor, uint16_t bgcolor) {
+		// Empty
+		return;
+	}
+
+	virtual void print(const char *string) {
+		int32_t posX = getCursorX();
+		int32_t posY = getCursorY();
+
+		drawString(string, posX, posY);
+	}
+
+	virtual void println(const char *string) {
+		print(string);
+		print("\n");
+	}
+
+	virtual void printf(const char *fmt, ...) {
+		char s[256] = {0};
+		va_list args;
+
+		::va_start(args, fmt);
+		::vsnprintf(s, 256, fmt, args);
+		::va_end(args);
+
+		print(s);
+	}
+
 	// ==============================================================
 	//! @brief 排他制御用のセマフォを初期化します
 	//! @return 初期化が成功したら true, 失敗したら false が返ります
@@ -714,7 +809,8 @@ public:
 	//! @brief タイマを初期化します
 	//! @param[in] (interval_ms) 割込み周期（ミリ秒）
 	// =============================================================
-	virtual void begin(uint32_t interval_ms) = 0;
+	virtual void begin(uint32_t interval_ms) {
+	}
 
 	// ==============================================================
 	//! @brief サブタイマを追加します
@@ -724,26 +820,32 @@ public:
 	// =============================================================
 	virtual void addSubTimer(std::string key,
 	                         uint32_t count_limit,
-	                         uint32_t initial_count = 0) = 0;
+	                         uint32_t initial_count = 0) {
+	}
 	// ==============================================================
 	//! @brief サブタイマの閾値を取得します
 	//! @param[in] (key) サブタイマの識別名
 	//! @return 指定されたサブタイマの閾値
 	// =============================================================
-	virtual uint32_t getSubTimerLimit(std::string key) = 0;
+	virtual uint32_t getSubTimerLimit(std::string key) {
+		return 0;
+	}
 
 	// ==============================================================
 	//! @brief サブタイマの閾値をミリ秒として取得します
 	//! @param[in] (key) サブタイマの識別名
 	//! @return 指定されたサブタイマの閾値をミリ秒に変換した値
 	// =============================================================
-	virtual uint32_t getSubTimerLimitMillis(std::string key) = 0;
+	virtual uint32_t getSubTimerLimitMillis(std::string key) {
+		return 0;
+	}
 
 	// ==============================================================
 	//! @brief サブタイマを削除します
 	//! @param[in] (key) サブタイマの識別名
 	// =============================================================
-	virtual void removeSubTimer(std::string key) = 0;
+	virtual void removeSubTimer(std::string key) {
+	}
 
 	// ==============================================================
 	//! @brief サブタイマのカウント値が閾値を超えていないか確認します
@@ -751,22 +853,206 @@ public:
 	//! @param[in] (reset) 自動再初期化機能の有効化
 	//! @return 閾値以上の場合は true, それ以外の場合は false が返ります
 	// =============================================================
-	virtual bool checkSubTimer(std::string key, bool reset = true) = 0;
+	virtual bool checkSubTimer(std::string key, bool reset = true) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief タイマをスタートします
 	//! @param[in] (enable_first_interrupt) 最初の割り込みを有効化
 	// =============================================================
-	virtual void start(bool enable_first_interrupt = false) = 0;
+	virtual void start(bool enable_first_interrupt = false) {
+	}
 
 	// ==============================================================
 	//! @brief 割り込みが発生したか確認します
 	//! @return 割り込みが発生していた場合は true, それ以外は false を返します
 	// =============================================================
-	virtual bool interrupted() = 0;
+	virtual bool interrupted() {
+		return false;
+	}
 
 protected:
 	volatile uint8_t _timer_num;
+};
+
+// ==============================================================
+// MARK: LoRaWAN Control Interface Class
+//! @brief LoRaWAN 通信機能の抽象化クラス
+//! @note リージョン: AS923 固定
+//! @note クラス: A 固定
+//! @note アクティベーション: OTAA のみ対応
+//! @note LoRaWAN 1.0 を想定（NwkKey は使用しない）
+//! @note データレート: ADR 有効（常に最小 DR3 [53byte, 2km] を想定）
+// =============================================================
+class ILoRaWanControl {
+public:
+	// ==============================================================
+	//! @brief LoRaWAN デバイスの初期化を行います（OTAA）
+	//! @param[in] (dev_eui) デバイス EUI
+	//! @param[in] (join_eui) Join EUI / App EUI
+	//! @param[in] (app_key) アプリケーションキー
+	//! @return 初期化に成功すれば true, それ以外は false を返す
+	// =============================================================
+	virtual bool beginOTAA(String dev_eui,
+	                       String join_eui,
+	                       String app_key) {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief LoRaWAN デバイスの初期化を行います（ABP）
+	//! @param[in] (dev_addr) デバイスアドレス（8桁 hex）
+	//! @param[in] (nwk_s_key) ネットワークセッション鍵（32桁 hex）
+	//! @param[in] (app_s_key) アプリケーションセッション鍵（32桁 hex）
+	//! @return 初期化に成功すれば true, それ以外は false を返す
+	// =============================================================
+	virtual bool beginABP(String dev_addr,
+	                      String nwk_s_key,
+	                      String app_s_key) {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief LoRaWAN ネットワークへの接続を試みます（OTAA）
+	//! @param[in] (timeout_ms) タイムアウト時間（ミリ秒）
+	//! @return 接続成功の場合は true、失敗の場合は false を返します
+	// =============================================================
+	virtual bool join(unsigned long timeout_ms = 60000) {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief LoRaWAN ネットワークへの接続状態を取得します
+	//! @return 接続されている場合は true、それ以外は false を返します
+	// =============================================================
+	virtual bool isJoined() {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief データを送信します（Unconfirmed Uplink）
+	//! @param[in] (*data) 送信するデータ
+	//! @param[in] (size) データサイズ（バイト）
+	//! @param[in] (port) LoRaWAN ポート番号（1-223）
+	//! @return 送信成功の場合は true、失敗の場合は false を返します
+	// =============================================================
+	virtual bool send(const uint8_t *data,
+	                  size_t size,
+	                  uint8_t fport) {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief デバイス EUI を取得します
+	//! @return デバイス EUI の文字列
+	// =============================================================
+	virtual String getDevEui() {
+		return "0000000000000000";
+	}
+
+	// ==============================================================
+	//! @brief Join EUI / App EUI を取得します
+	//! @return Join EUI の文字列
+	// =============================================================
+	virtual String getJoinEui() {
+		return "0000000000000000";
+	}
+
+	// ==============================================================
+	//! @brief 受信データが存在するか確認します
+	//! @return 受信データがある場合は true、それ以外は false を返します
+	// =============================================================
+	virtual bool available() {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief 受信データを読み取ります
+	//! @param[out] (*buffer) 読み取ったデータを格納するバッファ
+	//! @param[in] (buffer_size) バッファサイズ
+	//! @param[out] (*port) 受信ポート番号（nullptr の場合は無視）
+	//! @return 読み取ったデータのサイズ（バイト）
+	// =============================================================
+	virtual size_t read(uint8_t *buffer, size_t buffer_size, uint8_t *port = nullptr) {
+		return 0;
+	}
+
+	// ==============================================================
+	//! @brief LoRaWAN 機能がデバイスでサポートされているかを返します
+	//! @return サポートされていれば true, それ以外は false を返します
+	// =============================================================
+	virtual bool isSupported() {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief 送信完了を待機します（TX + RX1/RX2 ウィンドウ完了まで）
+	//! @param[in] (timeout_ms) タイムアウト時間（ミリ秒）
+	//! @return 送信完了の場合は true、タイムアウトの場合は false を返します
+	// =============================================================
+	virtual bool waitTxDone(uint32_t timeout_ms = 30000) {
+		return false;
+	}
+
+	// ==============================================================
+	//! @brief LoRaWAN スタックの定期処理を実行します
+	//! @note イベント処理やモデムとの通信を行います
+	//! @note 定期的に呼び出す必要があります
+	// =============================================================
+	virtual void doWork() {
+		// デフォルトでは何もしない
+	}
+
+	// ==============================================================
+	//! @brief 最後に発生したエラーの内容を文字列で返します
+	//! @return エラーの説明文字列。エラーがない場合は空文字列を返します
+	// =============================================================
+	virtual String getLastError() {
+		return "";
+	}
+
+protected:
+	// ==============================================================
+	//! @brief 16進文字列をバイト配列に変換します
+	//! @param[in] (hex_str) 16進文字列（例: "0123456789ABCDEF"）
+	//! @param[out] (*buffer) 変換結果を格納するバッファ
+	//! @param[in] (buffer_size) バッファサイズ（バイト数）
+	//! @return 変換に成功すれば true, それ以外は false を返す
+	// =============================================================
+	static bool parseHexString(const String &hex_str, uint8_t *buffer, size_t buffer_size) {
+		if (hex_str.length() != buffer_size * 2) {
+			return false;
+		}
+
+		for (size_t i = 0; i < buffer_size; i++) {
+			String byte_str = hex_str.substring(i * 2, i * 2 + 2);
+			char *end_ptr;
+			buffer[i] = strtol(byte_str.c_str(), &end_ptr, 16);
+			if (*end_ptr != '\0') {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	// ==============================================================
+	//! @brief バイト配列を16進文字列に変換します
+	//! @param[in] (*buffer) 変換元のバイト配列
+	//! @param[in] (buffer_size) バッファサイズ（バイト数）
+	//! @return 16進文字列（大文字、例: "0123456789ABCDEF"）
+	// =============================================================
+	static String toHexString(const uint8_t *buffer, size_t buffer_size) {
+		String result = "";
+		for (size_t i = 0; i < buffer_size; i++) {
+			if (buffer[i] < 0x10) {
+				result += "0";
+			}
+			result += String(buffer[i], HEX);
+		}
+		result.toUpperCase();
+		return result;
+	}
 };
 
 // ==============================================================
@@ -811,13 +1097,17 @@ public:
 	//! @return ステータス番号を返します
 	//! @note 実装によって意味が変化する可能性があります
 	// =============================================================
-	virtual int getStatus() = 0;
+	virtual int getStatus() {
+		return -1;
+	}
 
 	// ==============================================================
 	//! @brief 設定されているアクセスポイントの信号強度（RSSI）を取得します
 	//! @return 信号強度（dBm）
 	// =============================================================
-	virtual int getRSSI() = 0;
+	virtual int getRSSI() {
+		return 0;
+	}
 
 	// ==============================================================
 	//! @brief 無線通信機能のMACアドレスを取得します
@@ -832,7 +1122,9 @@ public:
 	//! @return 割り当てられた IP アドレス
 	//! @see MyIPAddress
 	// =============================================================
-	virtual MyIPAddress localIP() = 0;
+	virtual MyIPAddress localIP() {
+		return MyIPAddress(0, 0, 0, 0);
+	}
 
 	// ==============================================================
 	//! @brief 静的情報を設定します
@@ -847,7 +1139,9 @@ public:
 	                    String gateway,
 	                    String subnet,
 	                    String dns1,
-	                    String dns2) = 0;
+	                    String dns2) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 無線LANへの接続を試みます
@@ -855,7 +1149,9 @@ public:
 	//! @return 接続成功の場合は true、失敗の場合は false を返します
 	//! @see HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeout_ms)
 	// =============================================================
-	virtual bool connectWlan(unsigned long timeout_ms = 0) = 0;
+	virtual bool connectWlan(unsigned long timeout_ms = 0) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 無線LANへの接続を試みます
@@ -866,7 +1162,9 @@ public:
 	//! @see HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeout_ms)
 	// =============================================================
 	virtual bool connectWlan(String ap_name, String pass,
-	                         unsigned long timeout_ms = 0) = 0;
+	                         unsigned long timeout_ms = 0) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 無線LANを切断します
@@ -874,7 +1172,8 @@ public:
 	//! @param[in] (erase_ap_settings) アクセスポイント情報を消去するか
 	// =============================================================
 	virtual void disconnectWlan(bool exit_sta_mode     = true,
-	                            bool erase_ap_settings = true) = 0;
+	                            bool erase_ap_settings = true) {
+	}
 
 	// ==============================================================
 	//! @brief 対象のアクセスポイントが検出できるか調査します
@@ -888,7 +1187,9 @@ public:
 	virtual bool detectTargetAccessPoint(String ap_name,
 	                                     int32_t *rssi,
 	                                     bool *exist_same_name,
-	                                     bool print_result = true) = 0;
+	                                     bool print_result = true) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief mDNS による名前解決を行います
@@ -896,14 +1197,18 @@ public:
 	//! @param[in] (try_count) 試行回数
 	//! @return IPアドレスが返されます。見つからない場合は 0.0.0.0 が返されます。
 	// =============================================================
-	virtual MyIPAddress resolveMDNS(String host, uint8_t try_count = 2) = 0;
+	virtual MyIPAddress resolveMDNS(String host, uint8_t try_count = 2) {
+		return MyIPAddress(0, 0, 0, 0);
+	}
 
 	// ==============================================================
 	//! @brief アクセスポイントを探索します
 	//! @param[in] (print_result) 検出したアクセスポイントを表示するか
 	//! @return 検出したアクセスポイントのリスト（SSID）
 	// =============================================================
-	virtual std::map<int, String> scanAccessPoint(bool print_result = true) = 0;
+	virtual std::map<int, String> scanAccessPoint(bool print_result = true) {
+		return {};
+	}
 
 	// ==============================================================
 	//! @brief 無線接続がデバイスでサポートされているかを返します
@@ -1074,19 +1379,25 @@ public:
 	//! @brief リアルタイムクロックを初期化します
 	//! @return 成功すれば true、それ以外は false を返す
 	// =============================================================
-	virtual bool begin() = 0;
+	virtual bool begin() {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 時刻取得が可能かどうかを返します
 	//! @return 可能な場合は true、それ以外は false を返す
 	// =============================================================
-	virtual bool ready() = 0;
+	virtual bool ready() {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief リアルタイムクロックを NTP サーバと再同期します
 	//! @return 成功すれば true、失敗すれば false を返す
 	// =============================================================
-	virtual bool update() { return false; };
+	virtual bool update() {
+		return false;
+	};
 
 	// ==============================================================
 	//! @brief 現在の時間を取得します
@@ -1094,7 +1405,9 @@ public:
 	//! @return 成功すれば true、失敗すれば false を返す
 	//! @details 時間は設定したタイムゾーンに準拠します
 	// =============================================================
-	virtual bool getCurrentTime(struct tm *timeinfo) = 0;
+	virtual bool getCurrentTime(struct tm *timeinfo) {
+		return false;
+	}
 
 protected:
 	std::vector<String> servers = {};
@@ -1156,7 +1469,9 @@ public:
 	//! @param[in] (json) 保存する設定値
 	//! @return 成功すれば true, それ以外は false を返します
 	// =============================================================
-	virtual bool saveSettings(String fpath, JsonDocument json) = 0;
+	virtual bool saveSettings(String fpath, JsonDocument json) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 設定ファイルを読み込みます
@@ -1164,13 +1479,17 @@ public:
 	//! @param[out] (&json) 読み取った設定値
 	//! @return 成功すれば true, それ以外は false を返します
 	// =============================================================
-	virtual bool loadSettings(String fpath, JsonDocument &json) = 0;
+	virtual bool loadSettings(String fpath, JsonDocument &json) {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief 設定ファイルがあるストレージをフォーマットします
 	//! @return 成功すれば true、失敗すれば false を返す
 	// =============================================================
-	virtual bool formatStorage() = 0;
+	virtual bool formatStorage() {
+		return false;
+	}
 
 	// ==============================================================
 	//! @brief デバイス固有の設定値を返します

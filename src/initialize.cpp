@@ -9,6 +9,7 @@ std::unique_ptr<IoTTxAmbient> tx_ambient;
 std::unique_ptr<IoTTxFTP> tx_ftp;
 std::unique_ptr<IoTTxHTTP> tx_http;
 std::unique_ptr<IoTTxMQTT> tx_mqtt;
+std::unique_ptr<IoTTxLoRaWAN> tx_lora_wan;
 
 constexpr bool DEFAULT_FALSE = false;
 constexpr bool DEFAULT_TRUE  = true;
@@ -27,7 +28,7 @@ void InitializeLog(const char *save_dir) {
 	HAL.Log.setSaveDirectory(save_dir);
 	HAL.Log.setFileBaseName("LOG_", ".log");
 	if (HAL.Log.begin()) {
-		HAL.println("Done");
+		HAL.println("Done!");
 		HAL.Log.loggingStart();
 	} else {
 		HAL.println("Failed!");
@@ -38,48 +39,57 @@ void InitializeLog(const char *save_dir) {
 //! @brief パラメータ設定機能の初期化を行います
 void InitializeSettingParameter() {
 	HAL.print("Initialize Setting Server... ");
-	updateDisplay(DisplayTiming::SS_INIT_BEGIN, (INPUT_WAIT_TIME / 1000));
 
-	auto pressed_btn = HAL.waitForButtonPressed(INPUT_WAIT_TIME);
-	if ((pressed_btn & (uint8_t)PRESSED_BUTTON::PRESSED_BTN1) != 0) {
-		HAL.println("");
-		updateDisplay(DisplayTiming::SS_MODE_ENTRY);
+	if (not HAL.isWakeFromSleep()) {
+		updateDisplay(DisplayTiming::SS_INIT_BEGIN, (INPUT_WAIT_TIME / 1000));
+	} else {
+		updateDisplay(DisplayTiming::SS_INIT_BEGIN, 0);
+	}
 
-		if (INPUT_WAIT_TIME > 1000) {
-			// If device has a long wait time
-			// wait button release
-			while (HAL.BtnA_isPressed()) {
-				// Wait Release
-				HAL.update();
-				HAL.delay(5);
+	if (not HAL.isWakeFromSleep()) {
+		auto pressed_btn = HAL.waitForButtonPressed(INPUT_WAIT_TIME);
+		if ((pressed_btn & (uint8_t)PRESSED_BUTTON::PRESSED_BTN1) != 0) {
+			HAL.println("");
+			updateDisplay(DisplayTiming::SS_MODE_ENTRY);
+
+			if (INPUT_WAIT_TIME > 1000) {
+				// If device has a long wait time
+				// wait button release
+				while (HAL.BtnA_isPressed()) {
+					// Wait Release
+					HAL.update();
+					HAL.delay(5);
+				}
 			}
-		}
 
-		pressed_btn = HAL.waitForButtonPressed(INPUT_WAIT_TIME);
-		if ((pressed_btn & (uint8_t)PRESSED_BUTTON::PRESSED_BTN2) != 0) {
-			updateDisplay(DisplayTiming::SS_CLEAR_ALL);
-			HAL.delay(3000);
-			param_manager.begin(true);
-		} else {
-			updateDisplay(DisplayTiming::SS_FORMAT);
-			param_manager.begin();
-		}
+			pressed_btn = HAL.waitForButtonPressed(INPUT_WAIT_TIME);
+			if ((pressed_btn & (uint8_t)PRESSED_BUTTON::PRESSED_BTN2) != 0) {
+				// 設定を初期化して設定モードへ
+				updateDisplay(DisplayTiming::SS_CLEAR_ALL);
+				HAL.delay(3000);
+				param_manager.begin(true);
+			} else {
+				// 設定モードへ
+				updateDisplay(DisplayTiming::SS_FORMAT);
+				param_manager.begin();
+			}
 
-		String chipid = HAL.getChipUUID();
-		HAL.printf("%s\n", chipid.c_str());
-		HAL.printf("Up to %d byte packets can be received.\n", ZIGBEE_API_MAX_FRAME_SIZE);
-		updateDisplay(DisplayTiming::SS_READY);
-		HAL.delay(300);
-		sbt.reset(new SettingBT());
-		sbt->begin(chipid);
+			String chipid = HAL.getChipUUID();
+			HAL.printf("%s\n", chipid.c_str());
+			HAL.printf("Up to %d byte packets can be received.\n", ZIGBEE_API_MAX_FRAME_SIZE);
+			updateDisplay(DisplayTiming::SS_READY);
+			HAL.delay(300);
+			sbt.reset(new SettingBT());
+			sbt->begin(chipid);
 
-		HAL.Log.loggingStop();
-		while (true) {
-			HAL.delay(5);
-			HAL.update();
-			updateDisplay(DisplayTiming::SS_LOOP);
-			if (sbt->update() == ZAS_COMPLETE) {
-				UpdateSettings();
+			HAL.Log.loggingStop();
+			while (true) {
+				HAL.delay(5);
+				HAL.update();
+				updateDisplay(DisplayTiming::SS_LOOP);
+				if (sbt->update() == ZAS_COMPLETE) {
+					UpdateSettings();
+				}
 			}
 		}
 	}
@@ -89,12 +99,14 @@ void InitializeSettingParameter() {
 	updateDisplay(DisplayTiming::SS_INIT_DONE);
 	HAL.println("Done!");
 
-	// PRINT
-	HAL.println("Current settings");
-	String parameter_string = "";
-	serializeJsonPretty(param_manager.getSettingJson(), parameter_string);
-	HAL.print(parameter_string.c_str());
-	HAL.println("");
+	if (not HAL.isWakeFromSleep()) {
+		// PRINT
+		HAL.println("Current settings");
+		String parameter_string = "";
+		serializeJsonPretty(param_manager.getSettingJson(), parameter_string);
+		HAL.print(parameter_string.c_str());
+		HAL.println("");
+	}
 }
 
 //
@@ -308,7 +320,7 @@ void InitializeI2c() {
 		HAL.printf("    Port%d : ", port);
 
 		bool result = HAL.I2c.begin(port);
-		HAL.printf("%s\n", ((result == true) ? "Success!" : "Failed"));
+		HAL.printf("%s\n", ((result == true) ? "Success!" : "Failed!"));
 	}
 
 	updateDisplay(DisplayTiming::I2C_INIT_PERIPHERAL_DONE);
@@ -325,20 +337,23 @@ void InitializeI2cDevice() {
 
 	HAL.print("Initialize I2C devices... \n");
 	updateDisplay(DisplayTiming::I2C_INIT_DEVICE_BEGIN);
-
-	uint8_t mask = 0; // param_manager.getParameter<uint8_t>("I2C", "FILTER_MASK");
-	uint8_t addr = 0; // param_manager.getParameter<uint8_t>("I2C", "FILTER_ADDR");
 	i2c_device.reset(new I2C_Manager());
-	i2c_device->setAddressFilter(addr, mask);
-
+	
 	i2c_device->clearDetectedDevices();
 	HAL.takeSemaphoreMutex("i2c", portMAX_DELAY);
 	for (const uint8_t &port : ports) {
 		if (HAL.I2c.getWire(port) == nullptr) {
 			// 初期化に失敗したポート
-			HAL.printf("  Port%d ignore because init failed.", port);
+			HAL.printf("  Port%d ignore because init failed.\n", port);
 			continue;
 		}
+
+		String key        = "I2C_PORT" + String(port);
+		auto pattern_addr = param_manager.getParameter<const char *>(key.c_str(), "IGNORE_ADDR_REGEX", "");
+		auto pattern_name = param_manager.getParameter<const char *>(key.c_str(), "IGNORE_NAME_REGEX", "");
+		i2c_device->setIgnoreAddressPattern(port, pattern_addr);
+		i2c_device->setIgnoreNamePattern(port, pattern_name);
+
 		HAL.printf("  Port%d scanning...", port);
 		i2c_device->scanDevice(port);
 		HAL.print("  Done!\n");
@@ -360,24 +375,42 @@ void InitializeI2cDevice() {
 			           act_dev[i].sub_address);
 		}
 
-		HAL.takeSemaphoreMutex("i2c", portMAX_DELAY);
-		int8_t res = i2c_device->initializeDevice(act_dev[i].port, act_dev[i].address, act_dev[i].channel, act_dev[i].sub_address);
-		HAL.giveSemaphoreMutex("i2c");
-
-		if (res == I2C_IGNORE_DEVICE) {
-			HAL.println("Skip (ignore)!");
+		if (i2c_device->isIgnoreSensorAddress(act_dev[i].port, act_dev[i].address)) {
+			HAL.println("Skip (ignore address)!");
 			continue;
 		}
 
+		HAL.takeSemaphoreMutex("i2c", portMAX_DELAY);
+		int8_t res = i2c_device->initializeDevice(act_dev[i].port,
+		                                          act_dev[i].address,
+		                                          act_dev[i].channel,
+		                                          act_dev[i].sub_address);
+		HAL.giveSemaphoreMutex("i2c");
+
+		if (res == I2C_IGNORE_DEVICE) {
+			HAL.println("Skip (ignore device)!");
+			continue;
+		}
+
+		bool new_line = false;
 		for (int k = 0; k < res; k++) {
-			Sensor i2c_sensor;
-			i2c_sensor.type = TYPE_I2C;
-			i2c_sensor.name = i2c_device->getDeviceName(
+			String sensor_name = i2c_device->getDeviceName(
 			    act_dev[i].port,
 			    act_dev[i].address,
 			    act_dev[i].channel,
 			    act_dev[i].sub_address,
 			    k);
+
+			// パターンマッチによるセンサ除外
+			if (i2c_device->isIgnoreSensorName(act_dev[i].port, sensor_name.c_str())) {
+				HAL.printf("\n            Skip (%s)!", sensor_name.c_str());
+				new_line = true;
+				continue;
+			}
+
+			Sensor i2c_sensor;
+			i2c_sensor.type = TYPE_I2C;
+			i2c_sensor.name = sensor_name;
 			i2c_sensor.unit = i2c_device->getDeviceUnit(
 			    act_dev[i].port,
 			    act_dev[i].address,
@@ -409,6 +442,9 @@ void InitializeI2cDevice() {
 		// バスマルチプレクサで検出したデバイスがあれば更新する
 		act_dev = i2c_device->getAddressList();
 
+		if (new_line) {
+			HAL.println("");
+		}
 		HAL.println("Done!");
 	}
 	updateDisplay(DisplayTiming::I2C_INIT_DEVICE_DONE);
@@ -490,7 +526,7 @@ void InitializeModbus() {
 		uint32_t timeout_ms = param_manager.getParameter<uint32_t>(key.c_str(), "TIMEOUT_MS");
 
 		bool result = HAL.Modbus.begin(port, baudrate, data_bit, parity, timeout_ms);
-		HAL.printf("%s\n", ((result == true) ? "Success!" : "Failed"));
+		HAL.printf("%s\n", ((result == true) ? "Success!" : "Failed!"));
 	}
 
 	updateDisplay(DisplayTiming::MODBUS_INIT_PERIPHERAL_DONE);
@@ -703,7 +739,7 @@ void InitializeWiredLan() {
 
 		HAL.setUseLinkLayer(DATALINK_LAYER::ETHERNET);
 		updateDisplay(DisplayTiming::ETH_INIT_SUCCESS);
-		HAL.println("DONE!");
+		HAL.println("Done!");
 	} else {
 		HAL.println("Failed!");
 		updateDisplay(DisplayTiming::ETH_INIT_FAILED);
@@ -1025,6 +1061,97 @@ void InitializeMQTT() {
 	HAL.println("Done!");
 }
 
+void InitializeLoRaWAN() {
+	if (HAL.LoRaWan.isSupported() == false) {
+		// LoRa WAN not supported
+		return;
+	}
+
+	HAL.print("Initialize LoRa WAN...\n");
+	updateDisplay(DisplayTiming::LORA_WAN_INIT_BEGIN);
+	bool result = false;
+
+	HAL.print("    Setup... ");
+	if (param_manager.getParameter("LORA_WAN", "ABP", DEFAULT_FALSE) == true) {
+		const char *dev_addr  = param_manager.getParameter<const char *>("LORA_WAN", "ABP_DEV_ADDR");
+		const char *nwk_s_key = param_manager.getParameter<const char *>("LORA_WAN", "ABP_NWK_S_KEY");
+		const char *app_s_key = param_manager.getParameter<const char *>("LORA_WAN", "ABP_APP_S_KEY");
+		result                = HAL.LoRaWan.beginABP(dev_addr ? dev_addr : "",
+		                                             nwk_s_key ? nwk_s_key : "",
+		                                             app_s_key ? app_s_key : "");
+	} else {
+		const char *dev_eui  = param_manager.getParameter<const char *>("LORA_WAN", "OTAA_DEV_EUI");
+		const char *join_eui = param_manager.getParameter<const char *>("LORA_WAN", "OTAA_JOIN_EUI");
+		const char *app_key  = param_manager.getParameter<const char *>("LORA_WAN", "OTAA_APP_KEY");
+		result               = HAL.LoRaWan.beginOTAA(dev_eui ? dev_eui : "",
+		                                             join_eui ? join_eui : "",
+		                                             app_key ? app_key : "");
+	}
+	if (not result) {
+		HAL.println("Failed!");
+		auto err_msg = HAL.LoRaWan.getLastError();
+		updateDisplay(DisplayTiming::LORA_WAN_INIT_FAILED, err_msg.c_str());
+		HAL.println("Device will restart after 5 sec");
+		HAL.delay(5000);
+
+		HAL.reboot();
+		return;
+	}
+	HAL.println("Done!");
+
+	HAL.print("    Join.... ");
+	result = HAL.LoRaWan.join();
+	if (not result) {
+		HAL.println("Failed!");
+		auto err_msg = HAL.LoRaWan.getLastError();
+		updateDisplay(DisplayTiming::LORA_WAN_INIT_FAILED, err_msg.c_str());
+		HAL.println("Device will restart after 5 sec");
+		HAL.delay(5000);
+
+		HAL.reboot();
+		return;
+	}
+	HAL.println("Success!");
+
+	tx_lora_wan.reset(new IoTTxLoRaWAN());
+	tx_lora_wan->begin();
+
+	// パラメータの読み取り可否は features で調査済み（けど、再チェックした方がいいかも？）
+	const char *devID = param_manager.getParameter<const char *>("PARAM", "devID");
+	tx_lora_wan->setUniqueParam(devID);
+
+	uint8_t fport_name  = param_manager.getParameter<uint8_t>("LORA_WAN", "FPORT_NAME");
+	uint8_t fport_value = param_manager.getParameter<uint8_t>("LORA_WAN", "FPORT_VALUE");
+
+	if (fport_name == 199 or fport_value == 199) {
+		// WM1110 ではメトリクス収集で 199 使用済み
+		HAL.println("    Skip (failed)! FPort 199 is not available.");
+		updateDisplay(DisplayTiming::LORA_WAN_INIT_FAILED, "");
+		HAL.delay(5000);
+		HAL.reboot();
+		return;
+	}
+
+	if (fport_name == fport_value) {
+		HAL.println("    Skip (failed)! FPort name and data must be different.");
+		updateDisplay(DisplayTiming::LORA_WAN_INIT_FAILED, "");
+		HAL.delay(5000);
+		HAL.reboot();
+		return;
+	}
+
+	if (not tx_lora_wan->setLoRaWanParam(fport_name, fport_value)) {
+		HAL.println("    Skip (failed)! Invalid FPort value (1-223, not 199).");
+		updateDisplay(DisplayTiming::LORA_WAN_INIT_FAILED, "");
+		HAL.delay(5000);
+		HAL.reboot();
+		return;
+	}
+
+	updateDisplay(DisplayTiming::LORA_WAN_INIT_DONE);
+	HAL.println("Done!");
+}
+
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 //
 //  Sub Functions
@@ -1044,9 +1171,12 @@ struct Features ReadFeatures() {
 	feat.ftp_enable        = param_manager.getParameter("FTP", "ENABLE", DEFAULT_FALSE);
 	feat.http_enable       = param_manager.getParameter("HTTP", "ENABLE", DEFAULT_FALSE);
 	feat.mqtt_enable       = param_manager.getParameter("MQTT", "ENABLE", DEFAULT_FALSE);
+	feat.lora_wan_enable   = param_manager.getParameter("LORA_WAN", "ENABLE", DEFAULT_FALSE);
 	feat.batch_send_enable = param_manager.getParameter("PARAM", "BATCH_DATA_SEND", DEFAULT_FALSE);
 
-	feat.offline_mode = not(feat.ambient_enable or feat.ftp_enable or feat.http_enable or feat.mqtt_enable);
+	feat.needs_ip_network = (feat.ambient_enable or feat.ftp_enable or feat.http_enable or feat.mqtt_enable);
+	feat.offline_mode     = not(feat.needs_ip_network or feat.lora_wan_enable);
+	feat.sleep_enable     = param_manager.getParameter("PARAM", "DEVICE_SLEEP", DEFAULT_FALSE);
 
 	feat.wait_enable = param_manager.getParameter("PARAM", "WAIT_00_SEC", DEFAULT_FALSE);
 

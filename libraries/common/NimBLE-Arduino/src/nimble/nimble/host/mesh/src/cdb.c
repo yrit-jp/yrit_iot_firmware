@@ -16,7 +16,7 @@
 #include "rpl.h"
 #include "settings.h"
 #include "mesh_priv.h"
-#include "../include/mesh/glue.h"
+#include "nimble/nimble/host/mesh/include/mesh/glue.h"
 
 #if MYNEWT_VAL(BLE_MESH_CDB)
 /* Tracking of what storage changes are pending for App and Net Keys. We
@@ -1144,4 +1144,4 @@ void bt_mesh_cdb_init(void)
 }
 #endif
 
-#endif // MYNEWT_VAL(BLE_MESH)
+#endif /* MYNEWT_VAL(BLE_MESH) */

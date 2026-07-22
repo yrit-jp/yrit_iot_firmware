@@ -668,11 +668,11 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
                                        int8_t bus_channel,
                                        uint8_t sub_address,
                                        int16_t sub_id,
-                                       bool use_sub_addr,
                                        bool tx_buffered,
-                                       double *d_data,   // double 型データの格納先
-                                       int32_t *i_data,  // int 型データの格納先
-                                       String *s_data) { // String 型データの格納先
+                                       double *d_data,    // double 型データの格納先
+                                       int32_t *i_data,   // int 型データの格納先
+                                       String *s_data,    // String 型データの格納先
+                                       bool use_sub_addr) { // ヘッダでは `= false` のデフォルト引数
     uint8_t _address = use_sub_addr ? sub_address : address;
 
     // ユーザーセンサのチェック

@@ -19,19 +19,18 @@
 
 #ifndef _NIMBLE_NPL_OS_H_
 #define _NIMBLE_NPL_OS_H_
-#include "nimble/porting/nimble/include/syscfg/syscfg.h"
-
-#if CONFIG_NIMBLE_STACK_USE_MEM_POOLS
 
 #include <assert.h>
 #include <stdint.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
+#include "nimble/porting/nimble/include/os/queue.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
+#if CONFIG_BT_NIMBLE_USE_ESP_TIMER
 #include "esp_timer.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,15 +41,10 @@ extern "C" {
         (sizeof(array) / sizeof((array)[0]))
 #endif
 
-#ifdef ESP_PLATFORM
-extern int ets_printf(const char *fmt, ...);
-#else
-#define ets_printf printf
-#define IRAM_ATTR
-#define NIMBLE_CFG_CONTROLLER 1
-#endif
+#if CONFIG_BT_LE_CONTROLLER_NPL_OS_PORTING_SUPPORT
 
-#define  PLATFORM_BLE_LL_ASSERT(con)                         \
+extern int ets_printf(const char *fmt, ...);
+#define  BLE_LL_ASSERT(con)                         \
     do{                                             \
         if(!(con))  {                               \
             ets_printf("assertion:%s\n",#con);      \
@@ -166,7 +160,8 @@ ble_npl_get_current_task_id(void)
 static inline void
 ble_npl_eventq_init(struct ble_npl_eventq *evq)
 {
-    return npl_funcs->p_ble_npl_eventq_init(evq);
+    void na_npl_freertos_eventq_init(struct ble_npl_eventq *evq);
+    na_npl_freertos_eventq_init(evq);
 }
 
 static inline void
@@ -370,22 +365,13 @@ ble_npl_time_delay(ble_npl_time_t ticks)
 }
 
 #if NIMBLE_CFG_CONTROLLER
-#ifdef ESP_PLATFORM
 static inline void
 ble_npl_hw_set_isr(int irqn, uint32_t addr)
 {
     return npl_funcs->p_ble_npl_hw_set_isr(irqn, addr);
 }
-#else
-static inline void
-IRAM_ATTR ble_npl_hw_set_isr(int irqn, void (*addr)(void))
-{
-    return npl_funcs->p_ble_npl_hw_set_isr(irqn, addr);
-}
-#endif
 #endif
 
-//critical section
 static inline uint32_t
 ble_npl_hw_enter_critical(void)
 {
@@ -408,30 +394,9 @@ static inline bool ble_npl_hw_is_in_critical(void)
 #define ble_npl_event_deinit (*npl_funcs->p_ble_npl_event_deinit)
 #define ble_npl_event_reset (*npl_funcs->p_ble_npl_event_reset)
 
-#ifdef __cplusplus
-}
-#endif
-
-#else // Not using MEM Pools
-
-#include <assert.h>
-#include <stdint.h>
-#include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "freertos/queue.h"
-#include "freertos/semphr.h"
-#include "freertos/task.h"
-#include "freertos/timers.h"
-#ifdef CONFIG_BT_NIMBLE_USE_ESP_TIMER
-#include "esp_timer.h"
-#endif
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#else // CONFIG_BT_LE_CONTROLLER_NPL_OS_PORTING_SUPPORT
 
 #define BLE_NPL_OS_ALIGNMENT    4
-
 #define BLE_NPL_TIME_FOREVER    portMAX_DELAY
 
 #ifndef ESP_PLATFORM
@@ -755,10 +720,10 @@ ble_npl_hw_exit_critical(uint32_t ctx)
 }
 #endif
 
+#endif // CONFIG_BT_LE_CONTROLLER_NPL_OS_PORTING_SUPPORT
+
 #ifdef __cplusplus
 }
 #endif
-
-#endif // CONFIG_NIMBLE_STACK_USE_MEM_POOLS
 
 #endif  /* _NPL_H_ */

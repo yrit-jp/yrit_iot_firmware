@@ -12,9 +12,10 @@
 
 #define MESH_LOG_MODULE BLE_MESH_PROV_LOG
 
+#include "testing.h"
 #include "crypto.h"
 #include "adv.h"
-#include "../include/mesh/mesh.h"
+#include "nimble/nimble/host/mesh/include/mesh/mesh.h"
 #include "net.h"
 #include "rpl.h"
 #include "beacon.h"
@@ -305,11 +306,11 @@ static void prov_dh_key_gen(void)
 #if !CONFIG_BT_NIMBLE_CRYPTO_STACK_MBEDTLS
 	if (MYNEWT_VAL(BLE_MESH_PROV_OOB_PUBLIC_KEY) &&
 	    atomic_test_bit(bt_mesh_prov_link.flags, OOB_PUB_KEY)) {
-		if (uECC_valid_public_key(remote_pk, &curve_secp256r1)) {
+		if (uECC_valid_public_key(remote_pk, uECC_secp256r1())) {
 			BT_ERR("Public key is not valid");
 		} else if (uECC_shared_secret(remote_pk, bt_mesh_prov->private_key_be,
 					      bt_mesh_prov_link.dhkey,
-					      &curve_secp256r1) != TC_CRYPTO_SUCCESS) {
+					      uECC_secp256r1()) != TC_CRYPTO_SUCCESS) {
 			BT_ERR("DHKey generation failed");
 		} else {
 			dh_key_gen_complete();

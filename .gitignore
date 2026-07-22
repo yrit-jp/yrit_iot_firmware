@@ -1,5 +1,5 @@
-/build/output
-/build/cache
+/build/__output
+/build/__cache
 *example/
 *examples/
 .vscode
@@ -10,3 +10,4 @@ __pycache__
 # Doxygen generated documentation
 /output/
 *.tmp
+/.claude

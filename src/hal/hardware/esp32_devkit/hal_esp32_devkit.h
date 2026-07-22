@@ -4,6 +4,7 @@
 #define HAL_API_ESP32_DEVKIT_H
 
 #include "../hal_interface.h"
+#include <Wire.h>
 #include "utility/button.h"
 #include "utility/pin_define.h"
 #include "utility/tft_color_define.h"
@@ -21,36 +22,36 @@
 
 class HAL_Display_API : public IDisplayControl {
 public:
-	void drawPixel(int32_t x, int32_t y, uint32_t color) {}
-	void drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size) {}
-	void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) {}
-	void drawFastVLine(int32_t x, int32_t y, int32_t h, uint32_t color) {}
-	void drawFastHLine(int32_t x, int32_t y, int32_t w, uint32_t color) {}
-	void fillScreen(uint32_t color) {}
+	void drawPixel(int32_t x, int32_t y, uint32_t color) override {}
+	void drawChar(int32_t x, int32_t y, uint16_t c, uint32_t color, uint32_t bg, uint8_t size) override {}
+	void drawLine(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color) override {}
+	void drawFastVLine(int32_t x, int32_t y, int32_t h, uint32_t color) override {}
+	void drawFastHLine(int32_t x, int32_t y, int32_t w, uint32_t color) override {}
+	void fillScreen(uint32_t color) override {}
 
-	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font) { return 0; }
-	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y) { return 0; }
-	int16_t height(void) { return 2; }
-	int16_t width(void) { return 8; }
-	int16_t drawString(const char *string, int32_t poX, int32_t poY, uint8_t font) { return 0; }
-	int16_t drawString(const char *string, int32_t poX, int32_t poY) { return 0; }
-	int16_t color565(uint8_t red, uint8_t green, uint8_t blue) { return 0; }
+	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y, uint8_t font) override { return 0; }
+	int16_t drawChar(uint16_t uniCode, int32_t x, int32_t y) override { return 0; }
+	int16_t height(void) override { return 2; }
+	int16_t width(void) override { return 8; }
+	int16_t drawString(const char *string, int32_t poX, int32_t poY, uint8_t font) override { return 0; }
+	int16_t drawString(const char *string, int32_t poX, int32_t poY) override { return 0; }
+	int16_t color565(uint8_t red, uint8_t green, uint8_t blue) override { return 0; }
 
-	void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {}
-	void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) {}
-	void drawRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color) {}
-	void fillRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color) {}
+	void drawRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) override {}
+	void fillRect(int32_t x, int32_t y, int32_t w, int32_t h, uint32_t color) override {}
+	void drawRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color) override {}
+	void fillRoundRect(int32_t x0, int32_t y0, int32_t w, int32_t h, int32_t radius, uint32_t color) override {}
 
-	void setRotation(uint8_t r) {}
-	void startWrite() {}
-	void endWrite() {}
+	void setRotation(uint8_t r) override {}
+	void startWrite() override {}
+	void endWrite() override {}
 
-	void drawCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color) {}
-	void fillCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color) {}
-	void drawEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color) {}
-	void fillEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color) {}
-	void drawTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {}
-	void fillTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) {}
+	void drawCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color) override {}
+	void fillCircle(int32_t x0, int32_t y0, int32_t r, uint32_t color) override {}
+	void drawEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color) override {}
+	void fillEllipse(int16_t x0, int16_t y0, int32_t rx, int32_t ry, uint16_t color) override {}
+	void drawTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) override {}
+	void fillTriangle(int32_t x0, int32_t y0, int32_t x1, int32_t y1, int32_t x2, int32_t y2, uint32_t color) override {}
 
 	bool initializeSemaphoreMutex() override;
 	bool takeSemaphoreMutex(uint32_t wait_tick_time) override;
@@ -60,16 +61,16 @@ public:
 class HAL_Timer_API : public ITimerControl {
 public:
 	using ITimerControl::ITimerControl;
-	void begin(uint32_t interval_ms);
+	void begin(uint32_t interval_ms) override;
 	void addSubTimer(std::string key,
 	                 uint32_t count_limit,
-	                 uint32_t initial_count = 0);
-	uint32_t getSubTimerLimit(std::string key);
-	uint32_t getSubTimerLimitMillis(std::string key);
-	void removeSubTimer(std::string key);
-	bool checkSubTimer(std::string key, bool reset = true);
-	void start(bool enable_first_interrupt = false);
-	bool interrupted();
+	                 uint32_t initial_count = 0) override;
+	uint32_t getSubTimerLimit(std::string key) override;
+	uint32_t getSubTimerLimitMillis(std::string key) override;
+	void removeSubTimer(std::string key) override;
+	bool checkSubTimer(std::string key, bool reset = true) override;
+	void start(bool enable_first_interrupt = false) override;
+	bool interrupted() override;
 
 private:
 	uint32_t _interval_ms;
@@ -77,24 +78,24 @@ private:
 
 class HAL_WLAN_API : public IWirelessLanControl<WiFiClient> {
 public:
-	int getStatus();
-	int getRSSI();
-	MyIPAddress localIP();
-	bool config(String ip, String gateway, String subnet, String dns1, String dns2);
-	bool connectWlan(unsigned long timeout_ms = 0);
-	bool connectWlan(String ap_name, String pass, unsigned long timeout_ms = 0);
-	void disconnectWlan(bool exit_sta_mode = true, bool erase_ap_settings = true);
-	bool detectTargetAccessPoint(String ap_name, int32_t *rssi, bool *exist_same_name, bool print_result = true);
-	MyIPAddress resolveMDNS(String host, uint8_t try_count = 2);
-	std::map<int, String> scanAccessPoint(bool print_result = true);
+	int getStatus() override;
+	int getRSSI() override;
+	MyIPAddress localIP() override;
+	bool config(String ip, String gateway, String subnet, String dns1, String dns2) override;
+	bool connectWlan(unsigned long timeout_ms = 0) override;
+	bool connectWlan(String ap_name, String pass, unsigned long timeout_ms = 0) override;
+	void disconnectWlan(bool exit_sta_mode = true, bool erase_ap_settings = true) override;
+	bool detectTargetAccessPoint(String ap_name, int32_t *rssi, bool *exist_same_name, bool print_result = true) override;
+	MyIPAddress resolveMDNS(String host, uint8_t try_count = 2) override;
+	std::map<int, String> scanAccessPoint(bool print_result = true) override;
 };
 
 class HAL_NTP_RTC_API : public INtpRtcControl {
 public:
-	bool begin();
-	bool ready();
+	bool begin() override;
+	bool ready() override;
 	bool update() override;
-	bool getCurrentTime(struct tm *timeinfo);
+	bool getCurrentTime(struct tm *timeinfo) override;
 
 private:
 	String selected_ntp_server = "";
@@ -104,11 +105,11 @@ private:
 class HAL_LED_API : public ILedControl {
 public:
 	HAL_LED_API(uint8_t pin, uint8_t channel, uint16_t freq = 5000, uint8_t resolution = 8);
-	void begin();
-	void setBrightnessLevel(double percentage = 100);
-	void on();
-	void off();
-	void toggle();
+	void begin() override;
+	void setBrightnessLevel(double percentage = 100) override;
+	void on() override;
+	void off() override;
+	void toggle() override;
 
 private:
 	uint8_t _pin;
@@ -126,9 +127,9 @@ private:
 
 class HAL_SETTING_FILE_IO_API : public ISettingFileInputOutputControl {
 public:
-	bool saveSettings(String fpath, JsonDocument json);
-	bool loadSettings(String fpath, JsonDocument &json);
-	bool formatStorage();
+	bool saveSettings(String fpath, JsonDocument json) override;
+	bool loadSettings(String fpath, JsonDocument &json) override;
+	bool formatStorage() override;
 
 	JsonDocument deviceUniqueSettings() override;
 };
@@ -167,19 +168,19 @@ class HAL_API : public IHardwareAbstractionLayer<SemaphoreHandle_t> {
 public:
 	HAL_API() : Timer0(0), Timer1(1), Timer2(3), Led_Status(LED_G, LED_CHANNEL_GREEN), Led_Warning(LED_B, LED_CHANNEL_BLUE) {};
 
-	void begin();
-	void update();
-	uint8_t waitForButtonPressed(uint16_t wait_ms);
-	uint8_t BtnA_wasPressed();
-	uint8_t BtnB_wasPressed();
-	uint8_t BtnC_wasPressed();
-	uint8_t BtnA_isPressed();
-	uint8_t BtnB_isPressed();
-	uint8_t BtnC_isPressed();
-	String getChipUUID(bool include_prefix = true);
+	void begin() override;
+	void update() override;
+	uint8_t waitForButtonPressed(uint16_t wait_ms) override;
+	uint8_t BtnA_wasPressed() override;
+	uint8_t BtnB_wasPressed() override;
+	uint8_t BtnC_wasPressed() override;
+	uint8_t BtnA_isPressed() override;
+	uint8_t BtnB_isPressed() override;
+	uint8_t BtnC_isPressed() override;
+	String getChipUUID(bool include_prefix = true) override;
 
-	void delay(uint32_t ms);
-	void reboot();
+	void delay(uint32_t ms) override;
+	void reboot() override;
 
 	void endSetup() override;
 	int8_t getBatteryLevel() override;
@@ -198,6 +199,7 @@ public:
 	HAL_Timer_API Timer1;
 	HAL_Timer_API Timer2;
 
+	ILoRaWanControl LoRaWan;
 	HAL_WLAN_API Wlan;
 	IWiredLanControl<DummyClient> Lan;
 	HAL_NTP_RTC_API NtpRtc;

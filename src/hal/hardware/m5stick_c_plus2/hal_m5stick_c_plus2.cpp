@@ -76,7 +76,7 @@ void HAL_API::begin() {
 	           ESP_ARDUINO_VERSION_MINOR,
 	           ESP_ARDUINO_VERSION_PATCH);
 
-	HAL.Info.DEVICE_NAME = "M5Stick C Plus";
+	HAL.Info.DEVICE_NAME = "M5Stick C Plus2";
 }
 
 void HAL_API::update() {
@@ -150,9 +150,9 @@ void HAL_API::endSetup() {
 	// WatchDog Timer の再初期化
 	constexpr uint16_t WDT_TIMEOUT_SEC = 120;
 	esp_task_wdt_config_t wdt_config   = {
-	      .timeout_ms     = WDT_TIMEOUT_SEC * 1000,
-	      .idle_core_mask = 0, // Bitmask of cores
-	      .trigger_panic  = true};
+	    .timeout_ms     = WDT_TIMEOUT_SEC * 1000,
+	    .idle_core_mask = 0, // Bitmask of cores
+	    .trigger_panic  = true};
 	::esp_task_wdt_deinit();
 	::esp_task_wdt_init(&wdt_config);
 
@@ -195,7 +195,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 
 	uint64_t chipid  = ESP.getEfuseMac();
 	char bt_name[20] = {0};
-	snprintf(bt_name, 20, "%llX", chipid);
+	snprintf(bt_name, 20, "%012llX", chipid);
 	return prefix + String(bt_name);
 }
 
@@ -847,7 +847,6 @@ bool HAL_SETTING_FILE_IO_API::formatStorage() {
 }
 
 JsonDocument HAL_SETTING_FILE_IO_API::deviceUniqueSettings() {
-
 	JsonDocument doc;
 
 	JsonObject SAMPLING = doc["SAMPLING"].to<JsonObject>();

@@ -19,7 +19,7 @@
 #define NIMBLE_CPP_CLIENT_H_
 
 #include "nimconfig.h"
-#if defined(CONFIG_BT_ENABLED) && defined(CONFIG_BT_NIMBLE_ROLE_CENTRAL)
+#if CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL
 
 # if defined(CONFIG_NIMBLE_CPP_IDF)
 #  include "host/ble_gap.h"
@@ -48,10 +48,12 @@ struct NimBLETaskData;
  */
 class NimBLEClient {
   public:
+# if CONFIG_BT_NIMBLE_ROLE_OBSERVER
     bool connect(const NimBLEAdvertisedDevice* device,
                  bool                          deleteAttributes = true,
                  bool                          asyncConnect     = false,
                  bool                          exchangeMTU      = true);
+# endif
     bool connect(const NimBLEAddress& address, bool deleteAttributes = true, bool asyncConnect = false, bool exchangeMTU = true);
     bool           connect(bool deleteAttributes = true, bool asyncConnect = false, bool exchangeMTU = true);
     bool           disconnect(uint8_t reason = BLE_ERR_REM_USER_CONN_TERM);
@@ -95,9 +97,9 @@ class NimBLEClient {
 
 # if CONFIG_BT_NIMBLE_EXT_ADV
     void setConnectPhy(uint8_t phyMask);
+# endif
     bool updatePhy(uint8_t txPhysMask, uint8_t rxPhysMask, uint16_t phyOptions = 0);
     bool getPhy(uint8_t* txPhy, uint8_t* rxPhy);
-# endif
 
     struct Config {
         uint8_t deleteCallbacks : 1;     // Delete the callback object when the client is deleted.
@@ -213,7 +215,6 @@ class NimBLEClientCallbacks {
      */
     virtual void onMTUChange(NimBLEClient* pClient, uint16_t MTU);
 
-# if CONFIG_BT_NIMBLE_EXT_ADV
     /**
      * @brief Called when the PHY update procedure is complete.
      * @param [in] pClient A pointer to the client whose PHY was updated.
@@ -226,8 +227,7 @@ class NimBLEClientCallbacks {
      * * BLE_GAP_LE_PHY_CODED
      */
     virtual void onPhyUpdate(NimBLEClient* pClient, uint8_t txPhy, uint8_t rxPhy);
-# endif
 };
 
-#endif /* CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL */
-#endif /* NIMBLE_CPP_CLIENT_H_ */
+#endif // CONFIG_BT_ENABLED && CONFIG_BT_NIMBLE_ROLE_CENTRAL
+#endif // NIMBLE_CPP_CLIENT_H_

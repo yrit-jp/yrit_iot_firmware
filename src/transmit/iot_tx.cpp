@@ -60,7 +60,7 @@ void IoTTx::printPendingData() {
 }
 
 void IoTTx::printIndex() {
-	HAL.printf("%s [store, send] = [%d, %d]\n", _DEBUG_PREFIX, _tx_idx.store, _tx_idx.transmit);
+	HAL.printf("%s [store, send] = [%d, %d]\n", _DEBUG_PREFIX.c_str(), _tx_idx.store, _tx_idx.transmit);
 }
 
 void IoTTx::printIndexEx() {
@@ -71,24 +71,27 @@ void IoTTx::printIndexEx() {
 		}
 		ex_pendings++;
 	}
-	HAL.printf("%s [ex_store] = [%d]\n", _DEBUG_PREFIX, ex_pendings);
+	HAL.printf("%s [ex_store] = [%d]\n", _DEBUG_PREFIX.c_str(), ex_pendings);
 }
 
 // void IoTTx::debugMessage(const char *category, const char *prefix, const char *msg, const char *end) {
 void IoTTx::debugMessage(LogCategory log_category, LogLevel log_level, const char *msg, const char *end) {
 	constexpr const char *categories[] = {
-	    "Ambient",    // AMBIENT
-	    "Ambient Ex", // AMBIENT_EX
-	    "Ambient HB", // AMBIENT_HB
-	    "FTP",        // FTP
-	    "FTP Ex",     // FTP_EX
-	    "FTP HB",     // FTP_HB
-	    "HTTP",       // HTTP
-	    "HTTP Ex",    // HTTP_EX
-	    "HTTP HB",    // HTTP_HB
-	    "MQTT",       // MQTT
-	    "MQTT Ex",    // MQTT_EX
-	    "MQTT HB"     // MQTT_HB
+	    "Ambient",     // AMBIENT
+	    "Ambient Ex",  // AMBIENT_EX
+	    "Ambient HB",  // AMBIENT_HB
+	    "FTP",         // FTP
+	    "FTP Ex",      // FTP_EX
+	    "FTP HB",      // FTP_HB
+	    "HTTP",        // HTTP
+	    "HTTP Ex",     // HTTP_EX
+	    "HTTP HB",     // HTTP_HB
+	    "MQTT",        // MQTT
+	    "MQTT Ex",     // MQTT_EX
+	    "MQTT HB",     // MQTT_HB
+	    "LORA_WAN",    // LORA_WAN
+	    "LORA_WAN_EX", // LORA_WAN_EX
+	    "LORA_WAN_HB"  // LORA_WAN_HB
 	};
 	const char *category = categories[static_cast<int>(log_category)];
 

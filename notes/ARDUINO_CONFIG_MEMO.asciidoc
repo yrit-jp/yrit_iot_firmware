@@ -6,6 +6,7 @@
 |esp32 | v3.2.1 (ESP-IDF v5.4.2)
 |M5Stack | v3.2.5 (ESP-IDF v5.4.2)
 |Seeed SAMD Boards | v1.8.5
+|Seeed nRF52 Boards | v1.1.12
 |===
 
 ---
@@ -235,5 +236,76 @@
 |USB Stack | Arduino
 |Debug | Off
 |TX/RX LED | On
+|===
+
+
+.M5Stack Unit C6L (ESP32-C6)
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|CDC On Boot | cdc
+|CPU Frequency | 160MHz
+|Flash Frequency | 80MHz
+|Flash Mode | QIO
+|Flash Size | 16MB (128Mb)
+|Partition Scheme | Huge APP
+|Core Debug Level | なし
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|Zigbee Mode | Default
+|===
+
+
+.M5Stack Stick S3
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|USB Mode | Hardware CDC and JTAG
+|USB CDC On Boot | Enabled
+|USB Firmware MSC On Boot | Disabled
+|USB DFU On Boot | Disabled
+|Upload Mode | UART0 / Hardware CDC
+|CPU Frequency | 240MHz (WiFi/BT)
+|Flash Mode | QIO
+|Flash Size | 8MB (64Mb)
+|Partition Scheme | Default 8MB
+|Core Debug Level | なし
+|PSRAM | OPI PSRAM
+|Arduino Runs On | Core 1
+|Events Run On | Core 1
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|===
+
+
+.Arduino Nesso N1 (ESP32-C6)
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Upload Speed | 921600
+|CDC On Boot | cdc
+|CPU Frequency | 160MHz
+|Flash Frequency | 80MHz
+|Flash Mode | QIO
+|Flash Size | 16MB (128Mb)
+|Partition Scheme | Huge APP
+|Core Debug Level | なし
+|Erase All Flash Before Sketch Upload | Disabled
+|JTAG Adapter | Disabled
+|Zigbee Mode | Default
+|===
+
+
+.Seeeduino Wio Tracker 1110 (nRF52840)
+[options="header,autowidth"]
+|===
+^|設定項目 ^|設定値
+|Print Port | Serial (USB-CDC)
+|Customize LoRaWAN modem | No
+|Grove Power Supply | Off
+|SoftDevice | S140 6.1.1
+|Serial (USB-CDC) | Enable 
 |===
 

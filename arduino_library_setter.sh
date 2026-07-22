@@ -16,7 +16,8 @@ echo "[2] ESP32 Devkit"
 echo "[3] M5Stack"
 echo "[4] LilyGO"
 echo "[5] Wio Terminal"
-echo "[6] キャンセル"
+echo "[6] Wio Tracker 1110"
+echo "[7] キャンセル"
 echo -n "プロファイルを選択: "
 read -n 1 choice
 echo ""
@@ -27,7 +28,8 @@ case $choice in
     3) SOURCE="$(pwd)/libraries/m5stack" ;;
     4) SOURCE="$(pwd)/libraries/lilygo_t-display_s3_pro" ;;
     5) SOURCE="$(pwd)/libraries/wio_terminal" ;;
-    6) echo "キャンセルされました"; exit 0 ;;
+    6) SOURCE="$(pwd)/libraries/wio_tracker_1110" ;;
+    7) echo "キャンセルされました"; exit 0 ;;
     *) echo "無効な選択です"; exit 1 ;;
 esac
 

@@ -45,6 +45,11 @@ typedef struct {
 	FT_Error error;                 // ft_error
 	uint8_t debug_level;            // debug level
 } RenderTaskParameter;
+
+	#ifndef xTaskCreateUniversal
+		#define xTaskCreateUniversal(task, name, stack, param, priority, handle, core) \
+			xTaskCreate(task, name, stack, param, priority, handle)
+	#endif
 #endif
 
 /*! \endcond */

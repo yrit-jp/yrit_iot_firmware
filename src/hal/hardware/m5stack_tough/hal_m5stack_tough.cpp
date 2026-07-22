@@ -197,7 +197,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 
 	uint64_t chipid  = ESP.getEfuseMac();
 	char bt_name[20] = {0};
-	snprintf(bt_name, 20, "%llX", chipid);
+	snprintf(bt_name, 20, "%012llX", chipid);
 	return prefix + String(bt_name);
 }
 

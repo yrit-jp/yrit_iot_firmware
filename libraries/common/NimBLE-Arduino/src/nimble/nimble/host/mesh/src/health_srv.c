@@ -15,7 +15,7 @@
 #include <errno.h>
 #include <stdbool.h>
 
-#include "../include/mesh/mesh.h"
+#include "nimble/nimble/host/mesh/include/mesh/mesh.h"
 #include "mesh_priv.h"
 #include "adv.h"
 #include "net.h"
@@ -475,4 +475,5 @@ void bt_mesh_attention(struct bt_mesh_model *model, uint8_t time)
 	}
 	k_work_reschedule(&srv->attn_timer, K_SECONDS(time));
 }
-#endif
+
+#endif /* MYNEWT_VAL(BLE_MESH) */

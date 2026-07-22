@@ -28,12 +28,34 @@ public:
 	std::vector<uint8_t> scanDeviceUnderMultiplexer(uint8_t port);
 
 	// ==============================================================
-	//! @brief I2C のアドレスフィルタをセットします。
-	//! @param[in] (address)
-	//! @param[in] (mask)
-	//! @note 現在は使用されていません。
+	//! @brief I2C の無効アドレスを指定する正規表現をセットします
+	//! @param[in] (port) 適用するポート番号
+	//! @param[in] (pattern) 無効アドレスにマッチする正規表現
 	// =============================================================
-	void setAddressFilter(uint8_t address, uint8_t mask);
+	void setIgnoreAddressPattern(uint8_t port, const char *pattern);
+
+	// ==============================================================
+	//! @brief I2C の無効センサ名を指定する正規表現をセットします
+	//! @param[in] (port) 適用するポート番号
+	//! @param[in] (pattern) 無効センサ名にマッチする正規表現
+	// =============================================================
+	void setIgnoreNamePattern(uint8_t port, const char *pattern);
+
+	// ==============================================================
+	//! @brief 指定ポートにおいて、対象アドレスが無視対象かどうかを判定します
+	//! @param[in] (port) I2C ポート番号
+	//! @param[in] (address) 判定対象の I2C スレーブアドレス
+	//! @return 無視対象であれば true, それ以外(範囲外ポートを含む)は false を返します。
+	// ==============================================================
+	bool isIgnoreSensorAddress(uint8_t port, uint8_t address);
+
+	// ==============================================================
+	//! @brief 指定ポートにおいて、対象センサ名が無視対象かどうかを判定します
+	//! @param[in] (port) I2C ポート番号
+	//! @param[in] (name) 判定対象のセンサ名
+	//! @return 無視対象であれば true, それ以外(範囲外ポートを含む)は false を返します。
+	// ==============================================================
+	bool isIgnoreSensorName(uint8_t port, const char *name);
 
 	// ==============================================================
 	//! @brief 有効な I2C アドレスのリストを取得します
@@ -125,11 +147,48 @@ public:
 
 protected:
 	std::vector<I2CActiveDevice> _active_device;
-	struct AddressFilter {
-		uint8_t address;
-		uint8_t mask;
+	struct SensorFilterConfig {
+		struct {
+			String address; // 無視するアドレスを示す正規表現パターン
+			String name;    // 無視するセンサ名を示す正規表現パターン
+		} pattern;
+
+		struct {
+			std::vector<uint8_t> list; // 無視するアドレスのリスト
+			bool valid = false;        // キャッシュ判定フラグ
+		} cache;
 	};
-	struct AddressFilter _filter;
+	struct SensorFilterConfig _ignore[PORT_I2C::PORT_5 + 1];
+
+	// ==============================================================
+	//! @brief 正規表現パターンをトップレベルの '|' で分割します
+	//! @param[in] (regexp_pattern) 分割対象の正規表現パターン文字列（'\|' はリテラルの '|' として扱う）
+	//! @return 分割された各パターン断片の std::vector<std::string> を返します。
+	// ==============================================================
+	std::vector<String> splitPatternByPipe(const char *regexp_pattern);
+
+	// ==============================================================
+	//! @brief 文字列が、分割済みパターン断片群のいずれかに完全一致するか判定します
+	//! @param[in] (text) 判定対象の文字列
+	//! @param[in] (fragments) splitPatternByPipe() で分割済みのパターン断片群
+	//! @return いずれかの断片に完全一致すれば true, それ以外は false を返します。
+	// ==============================================================
+	bool matchesAnyFragment(const char *text, const std::vector<String> &fragments);
+
+	// ==============================================================
+	//! @brief 正規表現パターンに一致する I2C アドレスを 0x00〜0x7F の範囲で抽出します
+	//! @param[in] (regexp_pattern) IGNORE_ADDR_REGEX に相当する正規表現パターン文字列
+	//! @return パターンに一致した(無視すべき) I2C アドレスの std::vector<uint8_t> を返します。
+	// ==============================================================
+	std::vector<uint8_t> extractIgnoreAddress(const char *regexp_pattern);
+
+	// ==============================================================
+	//! @brief センサ名が無視対象パターンに一致するか判定します
+	//! @param[in] (name) 判定対象のセンサ名
+	//! @param[in] (regexp_pattern) IGNORE_NAME_REGEX に相当する正規表現パターン文字列
+	//! @return パターンに一致すれば true(無視すべきセンサ), それ以外は false を返します。
+	// ==============================================================
+	bool matchNamePattern(const char *name, const char *regexp_pattern);
 };
 
 #endif

@@ -3,6 +3,6 @@
 
 #define APP_MAIN_VERSION 6
 #define APP_MINOR_VERSION 0
-#define APP_RELEASE_TAG "Beta1"
+#define APP_RELEASE_TAG ""
 
 #endif /* APP_FIRMWARE_VERSION_H */

@@ -169,7 +169,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 	pdwUniqueID[3] = SERIAL_NUMBER_WORD_3;
 
 	char bt_name[40] = {0};
-	snprintf(bt_name, 40, "%lX%lX%lX%lX",
+	snprintf(bt_name, 40, "%08lX%08lX%08lX%08lX",
 	         pdwUniqueID[0], pdwUniqueID[1], pdwUniqueID[2], pdwUniqueID[3]);
 	return prefix + String(bt_name);
 }

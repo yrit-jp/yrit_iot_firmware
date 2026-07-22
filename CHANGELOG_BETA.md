@@ -3,6 +3,34 @@
 このファームウェアの主な変更点は全てこのファイルに記録されます。  
 フォーマットは [Keep a Changelog](https://keepachangelog.com/) に基づいています。
 
+## [ v6.0 Beta2 ] - 2026-05-13
+
+#### ✨ 機能追加
+
+- Wio Tracker 1110 (nRF52840 + LoRaWAN) に対応
+- LoRaWAN 送信モジュール (iot_tx_lorawan) を新規追加
+- hal_interface.h に ILoRaWanControl インターフェースを追加
+- iot_tx.h / iot_tx.cpp に LoRaWAN ログカテゴリを追加
+- LoRaWAN 表示タイミング定数を追加
+- system_sleep() 実装を追加
+
+#### 📝 機能変更
+
+- hal.h に _ENABLE_ / _DISABLE_ マクロを追加し各フラグを値で制御するよう変更
+- hal_interface.h の一部メソッドを純粋仮想関数から仮想関数に変更
+- 各ボード HAL ヘッダの仮想メソッドに override キーワードを追加
+- display.h に TFT カラー定数を追加
+- setting_parameters.cpp の WAIT_00_SEC / BATCH_DATA_SEND を WiFi/LAN がある場合のみ設定するよう変更
+- iot_tx_http.cpp / iot_tx_mqtt.cpp の toDouble() を std::strtod() に変更
+- i2cセンサ名を修正（DS248x アドレス文字列の角括弧を削除、TCA9548A デバイス名の余分な \_ を削除）
+- いくつかのライブラリで互換性保持のための修正
+
+#### 🐞 不具合修正
+
+- 条件コンパイルが一部正しくなかった不具合の修正
+- iot_tx.cpp の \_DEBUG_PREFIX に .c_str() が欠落していた不具合の修正
+- getChipUUID() で UUID が短くなる場合がある不具合の修正
+
 ## [ v6.0 Beta1 ] - 2026-01-30
 
 #### ✨ 機能追加

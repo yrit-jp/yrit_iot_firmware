@@ -17,11 +17,14 @@ void IoTTxMQTT::setMqttParam(String broker, uint16_t port, String base_topic, St
 			ip = HAL.Lan.resolveMDNS(broker);
 		}
 		if (ip.toString() == "0.0.0.0") {
+			// 解決に失敗した場合は 0.0.0.0 で固定してしまわないよう、
+			// 元のホスト名のまま保持して以降の接続処理で再解決を試みられるようにする
 			debugMessage(LogCategory::MQTT, LogLevel::Error, "Failed to resolve mDNS");
+			_broker = broker;
 		} else {
 			debugMessage(LogCategory::MQTT, LogLevel::Info, ("mDNS Resolve: " + broker + " -> " + ip.toString()).c_str());
+			_broker = ip.toString();
 		}
-		_broker = ip.toString();
 	} else {
 		_broker = broker;
 	}
@@ -244,10 +247,11 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 		auto type = estimateType(_buffer[_tx_idx.transmit].value);
 		switch (type) {
 		case TYPE_INTEGER:
+			// TODO: std::strtol への変更を検討
 			payload["value"] = _buffer[_tx_idx.transmit].value.toInt();
 			break;
 		case TYPE_DOUBLE:
-			payload["value"] = _buffer[_tx_idx.transmit].value.toDouble();
+			payload["value"] = std::strtod(_buffer[_tx_idx.transmit].value.c_str(), nullptr);
 			break;
 		default:
 			payload["value"] = _buffer[_tx_idx.transmit].value;
@@ -308,7 +312,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 }
 
 IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 
 	if (_penalty_wait.isActive()) {
@@ -364,15 +368,17 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 			static char *tmp_arr       = nullptr;
 			static size_t tmp_arr_size = 0;
 
+			// サイズ計算とエンコードの間に camera バッファが差し替わらないよう、
+			// 一括でロックを保持する（途中でロックを解放しない）
 			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			unsigned int len = base64::encodeLength(HAL.Camera.jpgImage.size());
-			HAL.giveSemaphoreMutex("camera");
 
 			if (tmp_arr_size < len + 1) {
 				delete[] tmp_arr;
 				tmp_arr = new char[len + 1]();
 				if (tmp_arr == nullptr) {
 					// メモリ確保に失敗した
+					HAL.giveSemaphoreMutex("camera");
 					debugMessage(LogCategory::MQTT_EX, LogLevel::Error,
 					             ("Failed alloc buffer. Size: " + String(len + 1)).c_str());
 					HAL.giveSemaphoreMutex(_mutex_key);
@@ -382,7 +388,6 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 			}
 			memset(tmp_arr, 0, tmp_arr_size);
 
-			HAL.takeSemaphoreMutex("camera", portMAX_DELAY);
 			base64::encode(&HAL.Camera.jpgImage[0], HAL.Camera.jpgImage.size(), tmp_arr);
 			HAL.giveSemaphoreMutex("camera");
 

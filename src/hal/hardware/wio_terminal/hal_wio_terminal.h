@@ -7,6 +7,7 @@
 #undef max
 
 #include "../hal_interface.h"
+#include <Wire.h>
 #include "utility/button.h"
 #include "utility/samd51_tc.h"
 
@@ -40,16 +41,16 @@ public:
 class HAL_Timer_API : public ITimerControl {
 public:
 	using ITimerControl::ITimerControl;
-	void begin(uint32_t interval_ms);
+	void begin(uint32_t interval_ms) override;
 	void addSubTimer(std::string key,
 	                 uint32_t count_limit,
-	                 uint32_t initial_count = 0);
-	uint32_t getSubTimerLimit(std::string key);
-	uint32_t getSubTimerLimitMillis(std::string key);
-	void removeSubTimer(std::string key);
-	bool checkSubTimer(std::string key, bool reset = true);
-	void start(bool enable_first_interrupt = false);
-	bool interrupted();
+	                 uint32_t initial_count = 0) override;
+	uint32_t getSubTimerLimit(std::string key) override;
+	uint32_t getSubTimerLimitMillis(std::string key) override;
+	void removeSubTimer(std::string key) override;
+	bool checkSubTimer(std::string key, bool reset = true) override;
+	void start(bool enable_first_interrupt = false) override;
+	bool interrupted() override;
 
 	bool _interrupted = false;
 
@@ -76,17 +77,17 @@ public:
 		return _clients[key].get();
 	}
 
-	int getStatus();
-	int getRSSI();
+	int getStatus() override;
+	int getRSSI() override;
 	std::vector<uint8_t> fetchMacAddress() override;
-	MyIPAddress localIP();
-	bool config(String ip, String gateway, String subnet, String dns1, String dns2);
-	bool connectWlan(unsigned long timeout_ms = 0);
-	bool connectWlan(String ap_name, String pass, unsigned long timeout_ms = 0);
-	void disconnectWlan(bool exit_sta_mode = true, bool erase_ap_settings = true);
-	bool detectTargetAccessPoint(String ap_name, int32_t *rssi, bool *exist_same_name, bool print_result = true);
-	MyIPAddress resolveMDNS(String host, uint8_t try_count = 2);
-	std::map<int, String> scanAccessPoint(bool print_result = true);
+	MyIPAddress localIP() override;
+	bool config(String ip, String gateway, String subnet, String dns1, String dns2) override;
+	bool connectWlan(unsigned long timeout_ms = 0) override;
+	bool connectWlan(String ap_name, String pass, unsigned long timeout_ms = 0) override;
+	void disconnectWlan(bool exit_sta_mode = true, bool erase_ap_settings = true) override;
+	bool detectTargetAccessPoint(String ap_name, int32_t *rssi, bool *exist_same_name, bool print_result = true) override;
+	MyIPAddress resolveMDNS(String host, uint8_t try_count = 2) override;
+	std::map<int, String> scanAccessPoint(bool print_result = true) override;
 
 private:
 	bool _use_dhcp;
@@ -100,10 +101,10 @@ private:
 
 class HAL_NTP_RTC_API : public INtpRtcControl {
 public:
-	bool begin();
-	bool ready();
+	bool begin() override;
+	bool ready() override;
 	bool update() override;
-	bool getCurrentTime(struct tm *timeinfo);
+	bool getCurrentTime(struct tm *timeinfo) override;
 
 private:
 	bool _inited = false;
@@ -122,9 +123,9 @@ public:
 		flash.begin();
 	}
 
-	bool saveSettings(String fpath, JsonDocument json);
-	bool loadSettings(String fpath, JsonDocument &json);
-	bool formatStorage();
+	bool saveSettings(String fpath, JsonDocument json) override;
+	bool loadSettings(String fpath, JsonDocument &json) override;
+	bool formatStorage() override;
 
 	JsonDocument deviceUniqueSettings() override;
 
@@ -234,19 +235,19 @@ class HAL_API : public IHardwareAbstractionLayer<SemaphoreHandle_t> {
 public:
 	HAL_API() : Timer0(0), Timer1(1), Timer2(2), Log() {};
 
-	void begin();
-	void update();
-	uint8_t waitForButtonPressed(uint16_t wait_ms);
-	uint8_t BtnA_wasPressed();
-	uint8_t BtnB_wasPressed();
-	uint8_t BtnC_wasPressed();
-	uint8_t BtnA_isPressed();
-	uint8_t BtnB_isPressed();
-	uint8_t BtnC_isPressed();
-	String getChipUUID(bool include_prefix = true);
+	void begin() override;
+	void update() override;
+	uint8_t waitForButtonPressed(uint16_t wait_ms) override;
+	uint8_t BtnA_wasPressed() override;
+	uint8_t BtnB_wasPressed() override;
+	uint8_t BtnC_wasPressed() override;
+	uint8_t BtnA_isPressed() override;
+	uint8_t BtnB_isPressed() override;
+	uint8_t BtnC_isPressed() override;
+	String getChipUUID(bool include_prefix = true) override;
 
-	void delay(uint32_t ms);
-	void reboot();
+	void delay(uint32_t ms) override;
+	void reboot() override;
 
 	int8_t getBatteryLevel() override;
 	uint32_t getFreeHeapSize() override;
@@ -269,6 +270,7 @@ public:
 	HAL_Timer_API Timer1;
 	HAL_Timer_API Timer2;
 
+	ILoRaWanControl LoRaWan;
 	HAL_WLAN_API Wlan;
 	IWiredLanControl<DummyClient> Lan;
 	HAL_NTP_RTC_API NtpRtc;

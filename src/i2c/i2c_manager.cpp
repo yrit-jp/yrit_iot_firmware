@@ -1,5 +1,7 @@
 #include "i2c_manager.h"
 
+#include <Regexp.h>
+
 // I2C sensor library
 #include "ADS1100.h"
 #include "ATMICL_ONE.h"
@@ -1536,6 +1538,37 @@ I2C_INIT_RESULT I2C_Manager::initializeDevice(uint8_t port,
 				_wire->begin();
 			}
 		}
+
+		if (not i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
+			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
+			i2c_sensors[port][address][bus_channel][sub_address].bme68x.reset(new Bme68x());
+			i2c_sensors[port][address][bus_channel][sub_address].bme68x->begin(_address, *_wire); // included soft reset
+			HAL.delay(1);
+			if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->checkStatus() == BME68X_OK) {
+				if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->readReg(BME68X_REG_CHIP_ID) == BME68X_CHIP_ID) {
+					// Sensor is ready
+					// Set the default configuration for temperature, pressure and humidity
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->setTPH();
+					// Disable internal heater
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->writeReg(BME68X_REG_CTRL_GAS_0, 0b00001000); // 0x70
+					// Enable gas conversion and heater step 0
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->writeReg(BME68X_REG_CTRL_GAS_1, 0b00100000); // 0x71
+					return I2C_4_DATA_DEVICE;
+				} else {
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x.reset();
+					_wire->end();
+					HAL.delay(20);
+					_wire->begin();
+				}
+
+			} else {
+				i2c_sensors[port][address][bus_channel][sub_address].bme68x.reset();
+				// 安定化のため Wire をリセットする
+				_wire->end();
+				HAL.delay(20);
+				_wire->begin();
+			}
+		}
 		break;
 	case 0x77:
 		if (bus_channel == -1 and not i2c_sensors[port][_address][-1][_address].tca9548a) {
@@ -1740,7 +1773,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
 			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
 			char ow_addr_str[128]  = {0};
-			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			snprintf(ow_addr_str, 128, "_%02X%02X%02X%02X%02X%02X%02X%02X",
 			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
 			// センサ名の取得
@@ -1798,7 +1831,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceAddress(sub_id);
 			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds248x->getDeviceValueId(sub_id);
 			char ow_addr_str[128]  = {0};
-			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			snprintf(ow_addr_str, 128, "_%02X%02X%02X%02X%02X%02X%02X%02X",
 			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
 			// センサ名の取得
@@ -2108,7 +2141,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			const uint8_t *ow_addr = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceAddress(sub_id);
 			uint8_t value_id       = i2c_sensors[port][address][bus_channel][sub_address].ds2485->getDeviceValueId(sub_id);
 			char ow_addr_str[128]  = {0};
-			snprintf(ow_addr_str, 128, "_[%02X%02X%02X%02X%02X%02X%02X%02X]",
+			snprintf(ow_addr_str, 128, "_%02X%02X%02X%02X%02X%02X%02X%02X",
 			         ow_addr[0], ow_addr[1], ow_addr[2], ow_addr[3], ow_addr[4], ow_addr[5], ow_addr[6], ow_addr[7]);
 
 			// センサ名の取得
@@ -2545,7 +2578,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
@@ -2574,7 +2607,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
@@ -2593,7 +2626,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
@@ -2624,6 +2657,23 @@ String I2C_Manager::getDeviceName(uint8_t port,
 				return "BME280";
 			}
 		}
+
+		if (i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
+			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
+			//@ url: https://www.switch-science.com/products/9274
+			switch (sub_id) {
+			case 0:
+				return "BME68x_Temp_(" + String(s_addr) + ")";
+			case 1:
+				return "BME68x_Humid_(" + String(s_addr) + ")";
+			case 2:
+				return "BME68x_Pressure_(" + String(s_addr) + ")";
+			case 3:
+				return "BME68x_Gas_Registance_(" + String(s_addr) + ")";
+			default:
+				return "BME68x";
+			}
+		}
 		break;
 	case 0x77:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
@@ -2634,7 +2684,7 @@ String I2C_Manager::getDeviceName(uint8_t port,
 			if (address == sub_address) {
 				return "TCA9548A";
 			} else {
-				return "(TCA9548A_" + String(bus_channel) + "ch)_" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
+				return "(TCA9548A_" + String(bus_channel) + "ch)" + getDeviceName(port, address, bus_channel, sub_address, sub_id, true);
 			}
 		}
 
@@ -3455,6 +3505,25 @@ String I2C_Manager::getDeviceUnit(uint8_t port,
 			}
 		}
 
+		if (i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
+			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
+			switch (sub_id) {
+			case 0:
+				//@ label: 温度
+				return "\'C";
+			case 1:
+				//@ label: 相対湿度
+				return "%RH";
+			case 2:
+				//@ label: 大気圧
+				return "Pa";
+			case 3:
+				//@ label: 抵抗値（ガス）
+				return "ohm";
+			default:
+				return "";
+			}
+		}
 		break;
 	case 0x77:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
@@ -4867,6 +4936,49 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 				return I2C_RES_FAILED;
 			}
 		}
+
+		if (i2c_sensors[port][address][bus_channel][sub_address].bme68x) {
+			// BME68X -- Digital Temp/Humid/Pressure/Gas sensor
+			bme68xData data;
+
+			switch (sub_id) {
+			case 0:
+				i2c_sensors[port][address][bus_channel][sub_address].bme68x->setOpMode(BME68X_FORCED_MODE);
+				// us to ms
+				HAL.delay((i2c_sensors[port][address][bus_channel][sub_address].bme68x->getMeasDur() / 1000) + 1);
+
+				i2c_sensors[port][address][bus_channel][sub_address].bme68x->fetchData();
+				if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->checkStatus() == BME68X_OK) {
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->getData(data);
+					*d_data = (double)data.temperature;
+					return I2C_RES_DOUBLE;
+				}
+				return I2C_RES_FAILED;
+			case 1:
+				if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->checkStatus() == BME68X_OK) {
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->getData(data);
+					*d_data = (double)data.humidity;
+					return I2C_RES_DOUBLE;
+				}
+				return I2C_RES_FAILED;
+			case 2:
+				if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->checkStatus() == BME68X_OK) {
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->getData(data);
+					*d_data = (double)data.pressure;
+					return I2C_RES_DOUBLE;
+				}
+				return I2C_RES_FAILED;
+			case 3:
+				if (i2c_sensors[port][address][bus_channel][sub_address].bme68x->checkStatus() == BME68X_OK) {
+					i2c_sensors[port][address][bus_channel][sub_address].bme68x->getData(data);
+					*d_data = (double)data.gas_resistance;
+					return I2C_RES_DOUBLE;
+				}
+				return I2C_RES_FAILED;
+			default:
+				return I2C_RES_FAILED;
+			}
+		}
 		return I2C_RES_FAILED;
 	case 0x77:
 		if (i2c_sensors[port][_address][-1][_address].tca9548a) {
@@ -4999,20 +5111,56 @@ I2C_DATA_RESULT I2C_Manager::fetchData(uint8_t port,
 
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 //
-//  Logic Functions
+//  MARK: Logic Functions
 //
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 I2C_Manager::I2C_Manager() {
-	_filter.mask    = 0x00;
-	_filter.address = 0x7F;
-
 	_active_device.reserve(10); // for memory efficient
 }
 
 void I2C_Manager::clearDetectedDevices() {
 	i2c_sensors.clear();
 	_active_device.clear();
+}
+
+void I2C_Manager::setIgnoreAddressPattern(uint8_t port, const char *pattern) {
+	if (port > PORT_I2C::PORT_5) {
+		return; // 範囲外ポートは無視
+	}
+	_ignore[port].pattern.address = pattern;
+}
+
+void I2C_Manager::setIgnoreNamePattern(uint8_t port, const char *pattern) {
+	if (port > PORT_I2C::PORT_5) {
+		return; // 範囲外ポートは無視
+	}
+	_ignore[port].pattern.name = pattern;
+}
+
+bool I2C_Manager::isIgnoreSensorAddress(uint8_t port, uint8_t address) {
+	if (port > PORT_I2C::PORT_5) {
+		return false; // 範囲外ポートは許可
+	}
+
+	auto &config = _ignore[port];
+
+	if (!config.cache.valid) {
+		config.cache.list  = extractIgnoreAddress(config.pattern.address.c_str());
+		config.cache.valid = true;
+	}
+
+	return std::find(config.cache.list.begin(),
+	                 config.cache.list.end(),
+	                 address) != config.cache.list.end();
+}
+
+bool I2C_Manager::isIgnoreSensorName(uint8_t port, const char *name) {
+	if (port > PORT_I2C::PORT_5) {
+		return false; // 範囲外ポートは許可
+	}
+
+	return matchNamePattern(name, _ignore[port].pattern.name.c_str());
 }
 
 void I2C_Manager::scanDevice(uint8_t port) {
@@ -5032,14 +5180,12 @@ void I2C_Manager::scanDevice(uint8_t port) {
 			continue;
 		}
 
-		if ((_filter.address & _filter.mask) == (addr & _filter.mask)) {
-			_active_device.emplace_back();
-			_active_device[i].address     = addr;
-			_active_device[i].sub_address = addr;
-			_active_device[i].channel     = -1;
-			_active_device[i].port        = port;
-			i++;
-		}
+		_active_device.emplace_back();
+		_active_device[i].address     = addr;
+		_active_device[i].sub_address = addr;
+		_active_device[i].channel     = -1;
+		_active_device[i].port        = port;
+		i++;
 	}
 }
 
@@ -5076,18 +5222,10 @@ std::vector<uint8_t> I2C_Manager::scanDeviceUnderMultiplexer(uint8_t port) {
 			continue;
 		}
 
-		if ((_filter.address & _filter.mask) == (sub_addr & _filter.mask)) {
-			v_addrs.push_back(sub_addr);
-		}
+		v_addrs.push_back(sub_addr);
 	}
 
 	return v_addrs;
-}
-
-void I2C_Manager::setAddressFilter(uint8_t address, uint8_t mask) {
-	// HAL.printf("FILTER:0x%02X,  MASK:0x%02X\n", address, mask);
-	_filter.address = address;
-	_filter.mask    = mask;
 }
 
 std::vector<I2CActiveDevice> I2C_Manager::getAddressList() {
@@ -5113,4 +5251,79 @@ void I2C_Manager::displayScanResult() {
 		           _active_device[i].port);
 	}
 	HAL.println("------------------------------------------------------------------------");
+}
+
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+//
+//  Logic Functions (internal)
+//
+/*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
+
+std::vector<String> I2C_Manager::splitPatternByPipe(const char *regexp_pattern) {
+	std::vector<String> result;
+	String current;
+
+	for (const char *p = regexp_pattern; *p != '\0'; ++p) {
+		if (*p == '\\' && *(p + 1) == '|') {
+			current += '|';
+			++p;
+		} else if (*p == '|') {
+			result.push_back(current);
+			current.remove(0);
+		} else {
+			current += *p;
+		}
+	}
+	result.push_back(current);
+
+	return result;
+}
+
+bool I2C_Manager::matchesAnyFragment(const char *text, const std::vector<String> &fragments) {
+	size_t textLen = ::strlen(text);
+	std::vector<char> textBuf(text, text + textLen + 1);
+
+	for (const auto &fragment : fragments) {
+		if (fragment.length() == 0) {
+			continue; // 空断片は常に不一致(意図しない全マッチを防ぐ)
+		}
+
+		MatchState ms;
+		ms.Target(textBuf.data());
+
+		char result = ms.Match(fragment.c_str());
+
+		if (result == REGEXP_MATCHED &&
+		    ms.MatchStart == 0 &&
+		    ms.MatchLength == textLen) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+std::vector<uint8_t> I2C_Manager::extractIgnoreAddress(const char *regexp_pattern) {
+	std::vector<uint8_t> ignoredList;
+	std::vector<String> fragments = splitPatternByPipe(regexp_pattern);
+
+	for (int addr = 0x00; addr <= 0x7F; ++addr) {
+		char hexBuf[8];
+		char decBuf[8];
+
+		std::snprintf(hexBuf, sizeof(hexBuf), "0x%02X", addr);
+		std::snprintf(decBuf, sizeof(decBuf), "%d", addr);
+
+		if (matchesAnyFragment(hexBuf, fragments) ||
+		    matchesAnyFragment(decBuf, fragments)) {
+			ignoredList.push_back(static_cast<uint8_t>(addr));
+		}
+	}
+
+	return ignoredList;
+}
+
+bool I2C_Manager::matchNamePattern(const char *name, const char *regexp_pattern) {
+	std::vector<String> fragments = splitPatternByPipe(regexp_pattern);
+	return matchesAnyFragment(name, fragments);
 }

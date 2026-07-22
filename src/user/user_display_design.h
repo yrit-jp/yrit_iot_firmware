@@ -37,6 +37,7 @@ void cb_AmbientBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_
 void cb_FtpBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 void cb_HttpBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 void cb_MqttBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
+void cb_LoraBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity);
 
 void cb_ReadMqttStatus(std::unique_ptr<OpenFontRender> &render, int status);
 

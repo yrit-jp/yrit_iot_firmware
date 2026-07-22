@@ -18,31 +18,7 @@
 ## 📋 はじめに
 
 YRIT IoT Firmwareは、HAL（Hardware Abstraction Layer：ハードウェア抽象化層）を使用して、様々なハードウェアプラットフォームをサポートしています。
-
-### 対応済みデバイス
-
-現在、以下のデバイスがサポートされています：
-
-| デバイス名 | ディスプレイ | 主なチップ |
-|-----------|------------|-----------|
-| M5Stack Basic | 320×240 | ESP32 |
-| M5Stack Core2 | 320×240 | ESP32 |
-| M5Stack CoreS3 | 320×240 | ESP32-S3 |
-| M5Stack Tough | 320×240 | ESP32 |
-| M5Stick C Plus | 240×135 | ESP32 |
-| M5Stick C Plus2 | 240×135 | ESP32 |
-| M5Station | 240×135 | ESP32 |
-| M5Stack Atom S3 | 128×128 | ESP32-S3 |
-| M5Stack Atom S3R | 128×128 | ESP32-S3 |
-| LILYGO T-Display S3 Pro | 222×480 | ESP32-S3 |
-| Wio Terminal | 320×240 | SAMD51 |
-| ESP32 DevKit | キャラクタLCD 8×2 | ESP32 |
-
-### 新しいデバイスを追加する理由
-
-- 独自のハードウェアプラットフォームを使用したい
-- 新しいM5Stackシリーズをサポートしたい
-- カスタムボードに対応させたい
+新規ハードウェアやカスタムハードウェアを使用する場合、いくつかのクラスや関数を実装することで対応させることが可能です。
 
 ---
 
@@ -94,6 +70,7 @@ src/hal/hardware/
 ### 最小構成
 
 最小限必要なファイル：
+
 - `hal_your_device.h`
 - `hal_your_device.cpp`
 
@@ -410,34 +387,34 @@ void HAL_WLAN_API::disconnectWlan(bool exit_sta_mode, bool erase_ap_settings) {
 
 ### 必須インターフェース
 
-| クラス名 | 説明 | 主な実装内容 |
-|---------|------|------------|
-| `IHardwareAbstractionLayer` | HAL統合クラス | begin, update, deepSleep, restart |
-| `IDisplayControl` | ディスプレイ制御 | 描画メソッド、ミューテックス管理 |
-| `ITimerControl` | タイマー制御 | タイマー開始、サブタイマー管理 |
-| `IWirelessLanControl` | WiFi制御 | 接続、切断、ステータス取得 |
+| クラス名                    | 説明             | 主な実装内容                      |
+| --------------------------- | ---------------- | --------------------------------- |
+| `IHardwareAbstractionLayer` | HAL統合クラス    | begin, update, deepSleep, restart |
+| `IDisplayControl`           | ディスプレイ制御 | 描画メソッド、ミューテックス管理  |
+| `ITimerControl`             | タイマー制御     | タイマー開始、サブタイマー管理    |
+| `IWirelessLanControl`       | WiFi制御         | 接続、切断、ステータス取得        |
 
 ### 推奨インターフェース
 
-| クラス名 | 説明 | 備考 |
-|---------|------|------|
-| `INtpRtcControl` | NTP/RTC制御 | 時刻同期が必要な場合 |
-| `ILedControl` | LED制御 | ステータスLEDがある場合 |
-| `ISettingFileInputOutputControl` | 設定ファイルI/O | SPIFFSやSDカード使用時 |
-| `ITfCardControl` | SDカード制御 | SDカードがある場合 |
-| `IWireI2cControl` | I2C制御 | I2Cセンサを使用する場合 |
-| `IGpioControl` | GPIO制御 | GPIOを使用する場合 |
+| クラス名                         | 説明            | 備考                    |
+| -------------------------------- | --------------- | ----------------------- |
+| `INtpRtcControl`                 | NTP/RTC制御     | 時刻同期が必要な場合    |
+| `ILedControl`                    | LED制御         | ステータスLEDがある場合 |
+| `ISettingFileInputOutputControl` | 設定ファイルI/O | SPIFFSやSDカード使用時  |
+| `ITfCardControl`                 | SDカード制御    | SDカードがある場合      |
+| `IWireI2cControl`                | I2C制御         | I2Cセンサを使用する場合 |
+| `IGpioControl`                   | GPIO制御        | GPIOを使用する場合      |
 
 ### オプションインターフェース
 
-| クラス名 | 説明 | 備考 |
-|---------|------|------|
-| `IWiredLanControl` | 有線LAN制御 | Ethernetモジュールがある場合 |
-| `IBluetoothLowEnergyControl` | BLE制御 | BLE機能を使用する場合 |
-| `IModbusControl` | Modbus制御 | Modbusセンサを使用する場合 |
-| `ICameraControl` | カメラ制御 | カメラモジュールがある場合 |
-| `IDebugLogControl` | デバッグログ | デバッグ機能が必要な場合 |
-| `IMetadataControl` | メタデータ制御 | デバイス情報管理用 |
+| クラス名                     | 説明           | 備考                         |
+| ---------------------------- | -------------- | ---------------------------- |
+| `IWiredLanControl`           | 有線LAN制御    | Ethernetモジュールがある場合 |
+| `IBluetoothLowEnergyControl` | BLE制御        | BLE機能を使用する場合        |
+| `IModbusControl`             | Modbus制御     | Modbusセンサを使用する場合   |
+| `ICameraControl`             | カメラ制御     | カメラモジュールがある場合   |
+| `IDebugLogControl`           | デバッグログ   | デバッグ機能が必要な場合     |
+| `IMetadataControl`           | メタデータ制御 | デバイス情報管理用           |
 
 ---
 
@@ -475,13 +452,13 @@ void HAL_WLAN_API::disconnectWlan(bool exit_sta_mode, bool erase_ap_settings) {
 
 ### プリプロセッサ定義
 
-| 定義 | 説明 | 例 |
-|------|------|-----|
-| `TARGET__YOUR_DEVICE` | デバイス識別子 | `TARGET__M5STACK_BASIC` |
-| `DISPLAY_*` | ディスプレイサイズ | `DISPLAY_320X240` |
-| `HAL_MQTT_MAX_PACKET_SIZE` | MQTTパケットサイズ | `65534` |
-| `HAL_ENABLE_EXCEPTIONAL_BUFFER` | 例外バッファ有効化 | - |
-| `BTN_LAYOUT_*` | ボタンレイアウト | `BTN_LAYOUT_STACK_BASIC` |
+| 定義                            | 説明               | 例                       |
+| ------------------------------- | ------------------ | ------------------------ |
+| `TARGET__YOUR_DEVICE`           | デバイス識別子     | `TARGET__M5STACK_BASIC`  |
+| `DISPLAY_*`                     | ディスプレイサイズ | `DISPLAY_320X240`        |
+| `HAL_MQTT_MAX_PACKET_SIZE`      | MQTTパケットサイズ | `65534`                  |
+| `HAL_ENABLE_EXCEPTIONAL_BUFFER` | 例外バッファ有効化 | -                        |
+| `BTN_LAYOUT_*`                  | ボタンレイアウト   | `BTN_LAYOUT_STACK_BASIC` |
 
 ### ディスプレイサイズ定義
 
@@ -518,7 +495,7 @@ void Display::drawSystemStatusBar(std::unique_ptr<OpenFontRender> &render) {
     render->setFontColor(TFT_WHITE, TFT_NAVY);
     render->printf("Your Device");
 
-    returnSemaphoreMutex();
+    giveSemaphoreMutex();
 }
 
 // その他のオーバーライドメソッド
@@ -534,6 +511,7 @@ void Display::drawSystemStatusBar(std::unique_ptr<OpenFontRender> &render) {
 ### シンプルなデバイス（参考）
 
 ESP32 DevKit のような最小構成：
+
 ```
 src/hal/hardware/esp32_devkit/
 ├── hal_esp32_devkit.h
@@ -547,6 +525,7 @@ src/hal/hardware/esp32_devkit/
 ### フル機能デバイス（参考）
 
 M5Stack Basic のような完全な実装：
+
 ```
 src/hal/hardware/m5stack_basic/
 ├── hal_m5stack_basic.h
@@ -557,61 +536,21 @@ src/hal/hardware/m5stack_basic/
 ### 実装の参考にすべきファイル
 
 **最小構成の参考:**
+
 - `src/hal/hardware/esp32_devkit/`
 - キャラクタLCD使用
 - 基本機能のみ実装
 
 **標準的な実装の参考:**
+
 - `src/hal/hardware/m5stack_basic/`
 - TFTディスプレイ使用
 - ほぼ全機能実装
 
 **最新デバイスの参考:**
+
 - `src/hal/hardware/m5stack_core_s3/`
 - ESP32-S3使用
 - 最新の機能に対応
 
 ---
-
-## 📌 まとめ
-
-### デバイス追加の手順
-
-1. **ディレクトリを作成**
-   - `src/hal/hardware/your_device/`
-
-2. **HALクラスを実装**
-   - `hal_your_device.h` - ヘッダーファイル
-   - `hal_your_device.cpp` - 実装ファイル
-
-3. **hal.h に登録**
-   - デバイス識別条件を追加
-   - 必要な定義を設定
-
-4. **ディスプレイオーバーライド（オプション）**
-   - カスタム画面表示を実装
-
-5. **ビルドと動作確認**
-   - Arduino IDEでボードを選択
-   - コンパイルと動作確認
-
-### ✅ 重要なポイント
-
-- `hal_interface.h` のインターフェースに準拠
-- 最小限は`IHardwareAbstractionLayer`, `IDisplayControl`, `ITimerControl`, `IWirelessLanControl`を実装
-- `hal.h` でのデバイス識別条件を正確に設定
-- 既存デバイスの実装を参考にする
-
-### 開発の流れ
-
-```
-1. 最小構成で動作確認
-   ↓
-2. 必要な機能を段階的に追加
-   ↓
-3. ディスプレイ表示をカスタマイズ
-   ↓
-4. 全機能の動作確認
-```
-
-この手順に従うことで、新しいハードウェアプラットフォームをYRIT IoT Firmwareに追加できます。

@@ -209,7 +209,7 @@ String HAL_API::getChipUUID(bool include_prefix) {
 
 	uint64_t chipid  = ESP.getEfuseMac();
 	char bt_name[20] = {0};
-	snprintf(bt_name, 20, "%llX", chipid);
+	snprintf(bt_name, 20, "%012llX", chipid);
 	return prefix + String(bt_name);
 }
 
@@ -871,42 +871,42 @@ bool HAL_NTP_RTC_API::getCurrentTime(struct tm *timeinfo) {
 /*_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/_/*/
 
 bool HAL_SETTING_FILE_IO_API::saveSettings(String fpath, JsonDocument json) {
-	if (not SPIFFS.begin(true)) {
-		HAL.println("Failed to begin SPIFFS.");
+	if (not FFat.begin(true)) {
+		HAL.println("Failed to begin FFat.");
 		return false;
 	}
 
 	String tmpl = "";
 	serializeJson(json, tmpl);
 
-	File f = SPIFFS.open(fpath.c_str(), "w");
+	File f = FFat.open(fpath.c_str(), "w");
 	if (not f) {
 		HAL.println("Open error.");
-		SPIFFS.end();
+		FFat.end();
 		return false;
 	}
 	f.print(tmpl);
 	f.close();
-	SPIFFS.end();
+	FFat.end();
 	return true;
 }
 
 bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
-	if (not SPIFFS.begin(true)) {
-		HAL.println("Failed to begin SPIFFS.");
+	if (not FFat.begin(true)) {
+		HAL.println("Failed to begin FFat.");
 		return false;
 	}
 
-	if (not SPIFFS.exists(fpath.c_str())) {
+	if (not FFat.exists(fpath.c_str())) {
 		HAL.println("File not exists.");
-		SPIFFS.end();
+		FFat.end();
 		return false;
 	}
 
-	File f = SPIFFS.open(fpath.c_str(), "r");
+	File f = FFat.open(fpath.c_str(), "r");
 	if (not f) {
 		HAL.println("Open error.");
-		SPIFFS.end();
+		FFat.end();
 		return false;
 	}
 
@@ -917,12 +917,12 @@ bool HAL_SETTING_FILE_IO_API::loadSettings(String fpath, JsonDocument &json) {
 	f.close();
 	deserializeJson(json, doc.c_str());
 
-	SPIFFS.end();
+	FFat.end();
 	return true;
 }
 
 bool HAL_SETTING_FILE_IO_API::formatStorage() {
-	return SPIFFS.format();
+	return FFat.format();
 }
 
 JsonDocument HAL_SETTING_FILE_IO_API::deviceUniqueSettings() {

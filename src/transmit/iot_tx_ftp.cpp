@@ -19,11 +19,14 @@ void IoTTxFTP::setFtpParam(String server, String user, String pass, uint8_t _ftp
 		}
 
 		if (ip.toString() == "0.0.0.0") {
+			// 解決に失敗した場合は 0.0.0.0 で固定してしまわないよう、
+			// 元のホスト名のまま保持して以降の接続処理で再解決を試みられるようにする
 			debugMessage(LogCategory::FTP, LogLevel::Error, "Failed to resolve mDNS");
+			_ftp.setServerAddress(server);
 		} else {
 			debugMessage(LogCategory::FTP, LogLevel::Info, ("mDNS Resolve: " + server + " -> " + ip.toString()).c_str());
+			_ftp.setServerAddress(ip.toString());
 		}
-		_ftp.setServerAddress(ip.toString());
 	} else {
 		_ftp.setServerAddress(server);
 	}
@@ -671,7 +674,7 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 }
 
 IoTTx_Tx_Result IoTTxFTP::transmitEx() {
-#ifdef HAL_ENABLE_EXCEPTIONAL_BUFFER
+#if HAL_ENABLE_EXCEPTIONAL_BUFFER
 	String prev_dir             = "";
 	enum IoTTx_Tx_Result result = RESULT_TX_ERROR;
 

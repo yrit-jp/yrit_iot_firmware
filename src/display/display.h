@@ -6,6 +6,22 @@
 #include "display_timing_type_def.h"
 #include <OpenFontRender.h>
 
+#ifndef TFT_BLACK
+#define TFT_BLACK (0x0000) /*   0,   0,   0 */
+#endif
+#ifndef TFT_RED
+#define TFT_RED (0xF800) /* 255,   0,   0 */
+#endif
+#ifndef TFT_YELLOW
+#define TFT_YELLOW (0xFFE0) /* 255, 255,   0 */
+#endif
+#ifndef TFT_WHITE
+#define TFT_WHITE (0xFFFF) /* 255, 255, 255 */
+#endif
+#ifndef TFT_GREENYELLOW
+#define TFT_GREENYELLOW (0xB7E0) /* 180, 255,   0 */
+#endif
+
 struct SystemMessageRenderParam {
 	uint16_t DISPLAY_WIDTH;
 	uint16_t DISPLAY_HEIGHT;

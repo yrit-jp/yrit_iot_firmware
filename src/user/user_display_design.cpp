@@ -104,6 +104,10 @@ void cb_AmbientBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_
 	cb_AmbientBufferUpdate_Default(render, remain_data_quantity);
 }
 
+void cb_LoraBufferUpdate(std::unique_ptr<OpenFontRender> &render, int remain_data_quantity) {
+	cb_LoraBufferUpdate_Default(render, remain_data_quantity);
+}
+
 void cb_ReadMqttStatus(std::unique_ptr<OpenFontRender> &render, int status) {
 	cb_ReadMqttStatus_Default(render, status);
 }

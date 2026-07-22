@@ -6,20 +6,21 @@
 
 ### 必要なソフトウェア
 
-| ソフトウェア | バージョン            | 備考                   |
-| ------------ | --------------------- | ---------------------- |
-| Arduino IDE  | v2.3.6 または v1.8.19 |                        |
-| Git          | 任意                  | リポジトリのクローン用 |
+| ソフトウェア | バージョン | 備考                   |
+| ------------ | ---------- | ---------------------- |
+| Arduino IDE  | v2.3.10    |                        |
+| Git          | 任意       | リポジトリのクローン用 |
 
 ### ボードマネージャのインストール
 
 Arduino IDE の「ボードマネージャ」から以下をインストールしてください。
 
-| ボード            | バージョン | 対象デバイス     |
-| ----------------- | ---------- | ---------------- |
-| esp32             | v3.2.1     | ESP32 DevKit     |
-| M5Stack           | v3.2.5     | M5Stack シリーズ |
-| Seeed SAMD Boards | v1.8.5     | Wio Terminal     |
+| ボード             | バージョン | 対象デバイス     |
+| ------------------ | ---------- | ---------------- |
+| esp32              | v3.2.1     | ESP32 DevKit     |
+| M5Stack            | v3.2.5     | M5Stack シリーズ |
+| Seeed SAMD Boards  | v1.8.5     | Wio Terminal     |
+| Seeed nRF52 Boards | v1.1.12    | Wio Tracker 1110 |
 
 ### ライブラリのセットアップ
 
@@ -43,7 +44,8 @@ bash arduino_library_setter.sh
 [3] M5Stack
 [4] LilyGO
 [5] Wio Terminal
-[6] キャンセル
+[6] Wio Tracker 1110
+[7] キャンセル
 プロファイルを選択: 3   # M5Stack がターゲットの場合
 ```
 
@@ -91,6 +93,20 @@ bash arduino_library_setter.sh
 | Partition Scheme | Huge APP (3MB No OTA/1MB SPIFFS) |
 
 他のデバイスの設定は `notes/ARDUINO_CONFIG_MEMO.asciidoc` を参照してください。
+
+### 自動ビルドスクリプト
+
+`build/` フォルダには、Arduino IDE を使わずコマンドラインで各ボード向けにビルドするためのスクリプトが同梱されています（`arduino-cli` が必要です）。ボードごとに `build/<board>/build.bat`（Windows）/ `build/<board>/build.sh`（Linux/macOS）が用意されており、成果物は `build/__output/` 以下に出力されます。
+
+```bash
+# 個別のボード向けにビルドする場合
+cd build/m5stack_basic
+./build.sh          # Windows の場合は build.bat
+
+# 全ボードをまとめてビルドする場合（同時実行数を指定可能）
+cd build
+./build_all.sh       # Windows の場合は build_all.bat
+```
 
 ---
 
