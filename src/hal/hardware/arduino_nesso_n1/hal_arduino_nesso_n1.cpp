@@ -781,14 +781,16 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 
 	disconnectWlan(true, false);
 	WiFi.mode(WIFI_STA);
-	wl_status_t result = WiFi.status();
+	WiFi.persistent(false);
+	WiFi.setSleep(false);
 	WiFi.begin(_ap_name.c_str(), _pass.c_str());
 
 	unsigned long start = millis();
-	while (result != WL_CONNECTED and (millis() - start) < (timeout_ms)) {
+	wl_status_t result;
+	do {
 		result = WiFi.status();
 		delay(500);
-	}
+	} while (result != WL_CONNECTED and (millis() - start) < (timeout_ms));
 
 	if (result != WL_CONNECTED) {
 		return false;
@@ -826,7 +828,7 @@ MyIPAddress HAL_WLAN_API::resolveMDNS(String host, uint8_t try_count) {
 		return MyIPAddress(invalid_ip[0], invalid_ip[1], invalid_ip[2], invalid_ip[3]);
 	}
 
-	HAL.Wlan.connectWlan();
+	HAL.Wlan.connectWlan(15000);
 
 	String mdns_name = HAL.getChipUUID();
 
@@ -1748,7 +1750,7 @@ bool HAL_MODBUS_API::begin(uint8_t port, uint32_t baudrate, uint8_t data_bit, ui
 uint8_t HAL_MODBUS_API::getTxPin(uint8_t port) {
 	switch (port) {
 	case PORT_MODBUS::PORT_1:
-		return TX1;
+		return TX1;	// 5: Grove connector
 	default:
 		return 0;
 	}
@@ -1757,7 +1759,7 @@ uint8_t HAL_MODBUS_API::getTxPin(uint8_t port) {
 uint8_t HAL_MODBUS_API::getRxPin(uint8_t port) {
 	switch (port) {
 	case PORT_MODBUS::PORT_1:
-		return RX1;
+		return RX1; // 4: Grove connector
 	default:
 		return 0;
 	}

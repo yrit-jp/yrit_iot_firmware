@@ -37,7 +37,7 @@ void IoTTxMQTT::setMqttParam(String broker, uint16_t port, String base_topic, St
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		_client.setSocketTimeout(4);
+		_client.setSocketTimeout(8);
 		_client.setClient(*(HAL.Wlan.getClient("mqtt")));
 		break;
 	case DATALINK_LAYER::ETHERNET:
@@ -134,7 +134,7 @@ bool IoTTxMQTT::transmitHeartbeat() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return false;
 		}
@@ -208,7 +208,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmit() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return result;
 		}
@@ -321,7 +321,7 @@ IoTTx_Tx_Result IoTTxMQTT::transmitEx() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return result;
 		}

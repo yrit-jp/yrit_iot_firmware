@@ -848,7 +848,7 @@ void InitializeNTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::NTP_CONNECT_WIFI);
-		while (not HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan(15000)) {
 			// led_blue.toggle();
 			HAL.println("WiFi error");
 			HAL.println("Retry after 1sec.");
@@ -925,7 +925,7 @@ void InitializeAmbient() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::AMBIENT_CONNECT_WIFI);
-		while (not HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan(15000)) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -970,7 +970,7 @@ void InitializeFTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::FTP_CONNECT_WIFI);
-		while (not HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan(15000)) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -1003,7 +1003,7 @@ void InitializeHTTP() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::HTTP_CONNECT_WIFI);
-		while (not HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan(15000)) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");
@@ -1046,7 +1046,7 @@ void InitializeMQTT() {
 
 	if (HAL.getUseLinkLayer() == DATALINK_LAYER::WIFI) {
 		updateDisplay(DisplayTiming::MQTT_CONNECT_WIFI);
-		while (not HAL.Wlan.connectWlan()) {
+		while (not HAL.Wlan.connectWlan(15000)) {
 			// led_blue.toggle();
 
 			HAL.println("WiFi error");

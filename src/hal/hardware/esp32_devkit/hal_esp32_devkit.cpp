@@ -616,14 +616,16 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 
 	disconnectWlan(true, false);
 	WiFi.mode(WIFI_STA);
-	wl_status_t result = WiFi.status();
+	WiFi.persistent(false);
+	WiFi.setSleep(false);
 	WiFi.begin(_ap_name.c_str(), _pass.c_str());
 
 	unsigned long start = millis();
-	while (result != WL_CONNECTED and (millis() - start) < (timeout_ms)) {
+	wl_status_t result;
+	do {
 		result = WiFi.status();
 		delay(500);
-	}
+	} while (result != WL_CONNECTED and (millis() - start) < (timeout_ms));
 
 	if (result != WL_CONNECTED) {
 		return false;
@@ -661,7 +663,7 @@ MyIPAddress HAL_WLAN_API::resolveMDNS(String host, uint8_t try_count) {
 		return MyIPAddress(invalid_ip[0], invalid_ip[1], invalid_ip[2], invalid_ip[3]);
 	}
 
-	HAL.Wlan.connectWlan();
+	HAL.Wlan.connectWlan(15000);
 
 	String mdns_name = HAL.getChipUUID();
 

@@ -1,4 +1,4 @@
-## Arduino IDE 1.8.19 設定
+## Arduino IDE 2.3.10 設定
 
 .ボードマネージャ
 [options="autowidth"]

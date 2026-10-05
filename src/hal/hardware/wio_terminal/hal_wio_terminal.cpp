@@ -573,11 +573,13 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 	}
 
 	WiFi.mode(WIFI_STA);
+	// WiFi.persistent(false);
+	// WiFi.setSleep(false);
 	disconnectWlan(false, false);
-	wl_status_t result = WiFi.status();
+	wl_status_t result;
 
 	unsigned long start = millis();
-	while (result != WL_CONNECTED and (millis() - start) < (timeout_ms)) {
+	do {
 		if (_pass.equals("")) {
 			result = WiFi.begin(_ap_name.c_str());
 		} else {
@@ -588,7 +590,7 @@ bool HAL_WLAN_API::connectWlan(String ap_name, String pass, unsigned long timeou
 			disconnectWlan(false, false);
 		}
 		delay(500);
-	}
+	} while (result != WL_CONNECTED and (millis() - start) < (timeout_ms));
 
 	if (result != WL_CONNECTED) {
 		return false;

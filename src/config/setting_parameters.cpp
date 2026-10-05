@@ -36,7 +36,7 @@ JsonDocument commonSettingTemplate() {
 			PARAM["WAIT_00_SEC"]     = "false";
 			PARAM["BATCH_DATA_SEND"] = "false";
 		}
-		PARAM["TX_INTERVAL_SEC"] = "5";
+		PARAM["TX_INTERVAL_SEC"] = "60";
 
 		JsonObject SAMPLING = doc["SAMPLING"].to<JsonObject>();
 		SAMPLING["I2C_MS"]  = "3000";

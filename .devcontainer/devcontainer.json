@@ -40,6 +40,7 @@
       }
     }
   },
+  "initializeCommand": "bash .devcontainer/detect-host-network.sh",
   "remoteUser": "node",
   "mounts": [
     "source=claude-code-bashhistory-${devcontainerId},target=/commandhistory,type=volume",

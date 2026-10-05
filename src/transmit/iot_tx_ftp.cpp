@@ -476,7 +476,7 @@ bool IoTTxFTP::transmitHeartbeat() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return false;
 		}
@@ -537,7 +537,7 @@ IoTTx_Tx_Result IoTTxFTP::transmit() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return result;
 		}
@@ -684,7 +684,7 @@ IoTTx_Tx_Result IoTTxFTP::transmitEx() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return result;
 		}

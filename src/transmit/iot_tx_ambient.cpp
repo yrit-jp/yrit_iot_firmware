@@ -69,7 +69,7 @@ IoTTx_Tx_Result IoTTxAmbient::transmit() {
 
 	switch (HAL.getUseLinkLayer()) {
 	case DATALINK_LAYER::WIFI:
-		if (not HAL.Wlan.connectWlan()) {
+		if (not HAL.Wlan.connectWlan(15000)) {
 			_penalty_wait.activate(5000);
 			return result;
 		}
